@@ -132,7 +132,7 @@ func (this *defaultRunner) cleanup() {
 	close(this.terminate)
 	close(this.reload)
 	close(this.ready)
-	this.logger.Printf("[INFO] Configured runner concluded all operations.")
+	this.logger.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
 }
 
 func (this *defaultRunner) Close() error {
