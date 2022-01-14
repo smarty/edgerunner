@@ -6,10 +6,10 @@ import (
 	"syscall"
 )
 
-func New(options ...option) TaskRunner {
+func New(options ...option) Runner {
 	var config configuration
 	Options.apply(options...)(&config)
-	return newConcurrentRunner(config)
+	return newRunner(config)
 }
 
 func (singleton) Context(value context.Context) option {
@@ -21,8 +21,8 @@ func (singleton) WatchTerminateSignals(values ...os.Signal) option {
 func (singleton) WatchReloadSignals(values ...os.Signal) option {
 	return func(this *configuration) { this.ReloadSignals = values }
 }
-func (singleton) ConcurrentTask(value ConcurrentTaskFactory) option {
-	return func(this *configuration) { this.ConcurrentTask = value }
+func (singleton) Task(value TaskFactory) option {
+	return func(this *configuration) { this.Task = value }
 }
 func (singleton) Monitor(value Monitor) option {
 	return func(this *configuration) { this.Monitor = value }
@@ -44,7 +44,7 @@ func (singleton) defaults(options ...option) []option {
 		Options.Context(context.Background()),
 		Options.WatchTerminateSignals(syscall.SIGINT, syscall.SIGTERM),
 		Options.WatchReloadSignals(syscall.SIGHUP),
-		Options.ConcurrentTask(noop.ConcurrentFactory),
+		Options.Task(noop.Factory),
 		Options.Monitor(noop),
 		Options.Logger(noop),
 	}, options...)
@@ -56,7 +56,7 @@ type configuration struct {
 	Context          context.Context
 	TerminateSignals []os.Signal
 	ReloadSignals    []os.Signal
-	ConcurrentTask   ConcurrentTaskFactory
+	Task             TaskFactory
 	Monitor          Monitor
 	Logger           Logger
 }
@@ -69,7 +69,7 @@ var Options singleton
 
 type nop struct{}
 
-func (this *nop) ConcurrentFactory(int, chan<- bool) Task { return this }
+func (this *nop) Factory(int, chan<- bool) Task { return this }
 
 func (*nop) Initialize(context.Context) error { return nil }
 func (*nop) Listen()                          {}

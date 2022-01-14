@@ -3,51 +3,57 @@ package edgerunner
 import (
 	"context"
 	"io"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 )
 
-type concurrentRunner struct {
-	ctx              context.Context
-	shutdown         context.CancelFunc
-	newTask          ConcurrentTaskFactory
-	terminateWatcher ListenCloser
-	reloadWatcher    ListenCloser
-	waiter           *sync.WaitGroup
-	ready            chan bool
-	reload           chan struct{}
-	identifier       int
-	logger           Logger
+type defaultRunner struct {
+	ctx        context.Context
+	shutdown   context.CancelFunc
+	newTask    TaskFactory
+	waiter     *sync.WaitGroup
+	ready      chan bool
+	terminate  chan os.Signal
+	reload     chan os.Signal
+	identifier int
+	monitor    Monitor
+	logger     Logger
 }
 
-func newConcurrentRunner(config configuration) TaskRunner {
+func newRunner(config configuration) Runner {
 	ctx, shutdown := context.WithCancel(config.Context)
-	this := &concurrentRunner{
-		ctx:              ctx,
-		shutdown:         shutdown,
-		newTask:          config.ConcurrentTask,
-		terminateWatcher: newSignalWatcher(ctx, shutdown, config.TerminateSignals),
-		waiter:           &sync.WaitGroup{},
-		ready:            make(chan bool, 16),
-		reload:           make(chan struct{}, 16),
-		logger:           config.Logger,
-	}
 
-	this.reloadWatcher = newSignalWatcher(this.ctx, this.Reload, config.TerminateSignals)
-	return this
+	terminate := make(chan os.Signal, 16)
+	reload := make(chan os.Signal, 16)
+	signal.Notify(terminate, config.TerminateSignals...)
+	signal.Notify(reload, config.ReloadSignals...)
+
+	return &defaultRunner{
+		ctx:       ctx,
+		shutdown:  shutdown,
+		newTask:   config.Task,
+		waiter:    &sync.WaitGroup{},
+		ready:     make(chan bool, 16),
+		terminate: terminate,
+		reload:    reload,
+		monitor:   config.Monitor,
+		logger:    config.Logger,
+	}
 }
 
-func (this *concurrentRunner) Listen() {
+func (this *defaultRunner) Listen() {
 	defer this.cleanup()
 
 	this.waiter.Add(1)
 	defer this.waiter.Wait()
 
-	go this.terminateWatcher.Listen()
-	go this.reloadWatcher.Listen()
+	go this.awaitTerminate()
 	go this.awaitShutdown()
 	go this.listen()
 }
-func (this *concurrentRunner) listen() {
+func (this *defaultRunner) listen() {
 	var active ListenCloser
 
 	// ensure that we close the ***CURRENT*** active instance at conclusion of method
@@ -64,7 +70,7 @@ func (this *concurrentRunner) listen() {
 		}
 	}
 }
-func (this *concurrentRunner) run(active ListenCloser) ListenCloser {
+func (this *defaultRunner) run(active ListenCloser) ListenCloser {
 	this.identifier++
 
 	pending := this.newTask(this.identifier, this.ready)
@@ -100,31 +106,38 @@ func (this *concurrentRunner) run(active ListenCloser) ListenCloser {
 		}
 	}
 }
-
-func (this *concurrentRunner) drainChannel() {
+func (this *defaultRunner) drainChannel() {
 	for i := 0; i < len(this.ready); i++ {
 		<-this.ready // drain ready channel; we only want the first value
 	}
 }
-func (this *concurrentRunner) awaitShutdown() {
+func (this *defaultRunner) awaitTerminate() {
+	select {
+	case <-this.ctx.Done():
+	case <-this.terminate:
+		this.shutdown()
+	}
+}
+func (this *defaultRunner) awaitShutdown() {
 	<-this.ctx.Done()
 	this.waiter.Done()
 }
-func (this *concurrentRunner) cleanup() {
+func (this *defaultRunner) cleanup() {
 	this.shutdown()
-	closeResource(this.terminateWatcher)
-	closeResource(this.reloadWatcher)
+	signal.Stop(this.terminate)
+	signal.Stop(this.reload)
+	close(this.terminate)
 	close(this.reload)
 	close(this.ready)
 }
 
-func (this *concurrentRunner) Close() error {
+func (this *defaultRunner) Close() error {
 	this.shutdown()
 	return nil
 }
-func (this *concurrentRunner) Reload() {
+func (this *defaultRunner) Reload() {
 	select {
-	case this.reload <- struct{}{}: // reload message sent
+	case this.reload <- syscall.Signal(0):
 	default: // buffer full, don't send more
 	}
 }

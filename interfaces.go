@@ -10,7 +10,7 @@ type (
 		Listen()
 		io.Closer
 	}
-	TaskRunner interface {
+	Runner interface {
 		ListenCloser
 		Reload()
 	}
@@ -21,7 +21,7 @@ type (
 		Initialize(ctx context.Context) error
 		ListenCloser
 	}
-	ConcurrentTaskFactory func(id int, ready chan<- bool) Task
+	TaskFactory func(id int, ready chan<- bool) Task
 )
 
 type Monitor interface {
