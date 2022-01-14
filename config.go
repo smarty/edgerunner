@@ -3,6 +3,7 @@ package edgerunner
 import (
 	"context"
 	"os"
+	"strings"
 	"syscall"
 )
 
@@ -21,8 +22,20 @@ func (singleton) WatchTerminateSignals(values ...os.Signal) option {
 func (singleton) WatchReloadSignals(values ...os.Signal) option {
 	return func(this *configuration) { this.ReloadSignals = values }
 }
-func (singleton) Task(value TaskFactory) option {
-	return func(this *configuration) { this.Task = value }
+func (singleton) Task(name, version string, value TaskFactory) option {
+	return func(this *configuration) {
+		name = strings.TrimSpace(name)
+		version = strings.TrimSpace(version)
+
+		if len(name) == 0 {
+			name = "(unknown)"
+		}
+		if len(version) > 0 {
+			version = " " + version
+		}
+		this.TaskBanner = name + version
+		this.TaskFactory = value
+	}
 }
 func (singleton) Monitor(value Monitor) option {
 	return func(this *configuration) { this.Monitor = value }
@@ -44,7 +57,7 @@ func (singleton) defaults(options ...option) []option {
 		Options.Context(context.Background()),
 		Options.WatchTerminateSignals(syscall.SIGINT, syscall.SIGTERM),
 		Options.WatchReloadSignals(syscall.SIGHUP),
-		Options.Task(noop.Factory),
+		Options.Task("", "", noop.Factory),
 		Options.Monitor(noop),
 		Options.Logger(noop),
 	}, options...)
@@ -56,7 +69,8 @@ type configuration struct {
 	Context          context.Context
 	TerminateSignals []os.Signal
 	ReloadSignals    []os.Signal
-	Task             TaskFactory
+	TaskBanner       string
+	TaskFactory      TaskFactory
 	Monitor          Monitor
 	Logger           Logger
 }

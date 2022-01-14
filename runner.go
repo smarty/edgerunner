@@ -10,16 +10,17 @@ import (
 )
 
 type defaultRunner struct {
-	ctx        context.Context
-	shutdown   context.CancelFunc
-	newTask    TaskFactory
-	waiter     *sync.WaitGroup
-	ready      chan bool
-	terminate  chan os.Signal
-	reload     chan os.Signal
-	identifier int
-	monitor    Monitor
-	logger     Logger
+	ctx         context.Context
+	shutdown    context.CancelFunc
+	taskBanner  string
+	taskFactory TaskFactory
+	waiter      *sync.WaitGroup
+	ready       chan bool
+	terminate   chan os.Signal
+	reload      chan os.Signal
+	identifier  int
+	monitor     Monitor
+	logger      Logger
 }
 
 func newRunner(config configuration) Runner {
@@ -31,19 +32,21 @@ func newRunner(config configuration) Runner {
 	signal.Notify(reload, config.ReloadSignals...)
 
 	return &defaultRunner{
-		ctx:       ctx,
-		shutdown:  shutdown,
-		newTask:   config.Task,
-		waiter:    &sync.WaitGroup{},
-		ready:     make(chan bool, 16),
-		terminate: terminate,
-		reload:    reload,
-		monitor:   config.Monitor,
-		logger:    config.Logger,
+		ctx:         ctx,
+		shutdown:    shutdown,
+		taskBanner:  config.TaskBanner,
+		taskFactory: config.TaskFactory,
+		waiter:      &sync.WaitGroup{},
+		ready:       make(chan bool, 16),
+		terminate:   terminate,
+		reload:      reload,
+		monitor:     config.Monitor,
+		logger:      config.Logger,
 	}
 }
 
 func (this *defaultRunner) Listen() {
+	this.logger.Printf("[INFO] Running configured task [%s]...", this.taskBanner)
 	defer this.cleanup()
 
 	this.waiter.Add(1)
@@ -65,7 +68,8 @@ func (this *defaultRunner) listen() {
 		select {
 		case <-this.ctx.Done():
 			return
-		case <-this.reload:
+		case value := <-this.reload:
+			this.logger.Printf("[INFO] Received OS signal [%s], instructing runner to reload configured task...", value)
 			continue
 		}
 	}
@@ -73,7 +77,7 @@ func (this *defaultRunner) listen() {
 func (this *defaultRunner) run(active ListenCloser) ListenCloser {
 	this.identifier++
 
-	pending := this.newTask(this.identifier, this.ready)
+	pending := this.taskFactory(this.identifier, this.ready)
 	if pending == nil {
 		this.logger.Printf("[WARN] No task created for ID [%d].", this.identifier)
 		return active
@@ -114,7 +118,8 @@ func (this *defaultRunner) drainChannel() {
 func (this *defaultRunner) awaitTerminate() {
 	select {
 	case <-this.ctx.Done():
-	case <-this.terminate:
+	case value := <-this.terminate:
+		this.logger.Printf("[INFO] Received OS signal [%s], shutting down runner along with any associated task(s)...", value)
 		this.shutdown()
 	}
 }
@@ -129,6 +134,7 @@ func (this *defaultRunner) cleanup() {
 	close(this.terminate)
 	close(this.reload)
 	close(this.ready)
+	this.logger.Printf("[INFO] Configured runner concluded all operations.")
 }
 
 func (this *defaultRunner) Close() error {
