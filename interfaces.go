@@ -1,5 +1,10 @@
 package edgerunner
 
+import (
+	"context"
+	"io"
+)
+
 type (
 	ListenCloser interface {
 		Listen()
