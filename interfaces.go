@@ -24,9 +24,6 @@ type (
 	TaskFactory func(id int, ready chan<- bool) Task
 )
 
-type Monitor interface {
-	// TODO
-}
 type Logger interface {
 	Printf(string, ...interface{})
 }

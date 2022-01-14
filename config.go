@@ -37,9 +37,6 @@ func (singleton) Task(name, version string, value TaskFactory) option {
 		this.TaskFactory = value
 	}
 }
-func (singleton) Monitor(value Monitor) option {
-	return func(this *configuration) { this.Monitor = value }
-}
 func (singleton) Logger(value Logger) option {
 	return func(this *configuration) { this.Logger = value }
 }
@@ -58,7 +55,6 @@ func (singleton) defaults(options ...option) []option {
 		Options.WatchTerminateSignals(syscall.SIGINT, syscall.SIGTERM),
 		Options.WatchReloadSignals(syscall.SIGHUP),
 		Options.Task("", "", noop.Factory),
-		Options.Monitor(noop),
 		Options.Logger(noop),
 	}, options...)
 }
@@ -71,7 +67,6 @@ type configuration struct {
 	ReloadSignals    []os.Signal
 	TaskBanner       string
 	TaskFactory      TaskFactory
-	Monitor          Monitor
 	Logger           Logger
 }
 type option func(*configuration)

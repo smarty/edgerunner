@@ -19,7 +19,6 @@ type defaultRunner struct {
 	terminate   chan os.Signal
 	reload      chan os.Signal
 	identifier  int
-	monitor     Monitor
 	logger      Logger
 }
 
@@ -40,7 +39,6 @@ func newRunner(config configuration) Runner {
 		ready:       make(chan bool, 16),
 		terminate:   terminate,
 		reload:      reload,
-		monitor:     config.Monitor,
 		logger:      config.Logger,
 	}
 }
@@ -112,7 +110,7 @@ func (this *defaultRunner) run(active ListenCloser) ListenCloser {
 }
 func (this *defaultRunner) drainChannel() {
 	for i := 0; i < len(this.ready); i++ {
-		<-this.ready // drain ready channel; we only want the first value
+		<-this.ready
 	}
 }
 func (this *defaultRunner) awaitTerminate() {
@@ -128,6 +126,10 @@ func (this *defaultRunner) awaitShutdown() {
 	this.waiter.Done()
 }
 func (this *defaultRunner) cleanup() {
+	// we arrive here in one of three ways:
+	// 1. parent context shutdown
+	// 2. our context shutdown/cancel has been called via Close()
+	// 3. our context shutdown/cancel has been called via a terminate signal
 	this.shutdown()
 	signal.Stop(this.terminate)
 	signal.Stop(this.reload)
@@ -138,10 +140,15 @@ func (this *defaultRunner) cleanup() {
 }
 
 func (this *defaultRunner) Close() error {
+	this.logger.Printf("[INFO] Request to close runner received, shutting down runner along with any associated task(s)...")
 	this.shutdown()
 	return nil
 }
 func (this *defaultRunner) Reload() {
+	if len(this.reload) > 0 {
+		return
+	}
+
 	select {
 	case this.reload <- syscall.Signal(0):
 	default: // buffer full, don't send more
