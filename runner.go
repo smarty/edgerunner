@@ -126,10 +126,6 @@ func (this *defaultRunner) awaitShutdown() {
 	this.waiter.Done()
 }
 func (this *defaultRunner) cleanup() {
-	// we arrive here in one of three ways:
-	// 1. parent context shutdown
-	// 2. our context shutdown/cancel has been called via Close()
-	// 3. our context shutdown/cancel has been called via a terminate signal
 	this.shutdown()
 	signal.Stop(this.terminate)
 	signal.Stop(this.reload)
@@ -150,6 +146,7 @@ func (this *defaultRunner) Reload() {
 	}
 
 	select {
+	case <-this.ctx.Done(): // shutting down, don't reload
 	case this.reload <- syscall.Signal(0):
 	default: // buffer full, don't send more
 	}
