@@ -3,7 +3,6 @@ package edgerunner
 import (
 	"context"
 	"os"
-	"strings"
 	"syscall"
 )
 
@@ -22,20 +21,14 @@ func (singleton) WatchTerminateSignals(values ...os.Signal) option {
 func (singleton) WatchReloadSignals(values ...os.Signal) option {
 	return func(this *configuration) { this.ReloadSignals = values }
 }
-func (singleton) Task(name, version string, value TaskFactory) option {
-	return func(this *configuration) {
-		name = strings.TrimSpace(name)
-		version = strings.TrimSpace(version)
-
-		if len(name) == 0 {
-			name = "(unknown)"
-		}
-		if len(version) > 0 {
-			version = " " + version
-		}
-		this.TaskBanner = name + version
-		this.TaskFactory = value
-	}
+func (singleton) TaskName(value string) option {
+	return func(this *configuration) { this.TaskName = value }
+}
+func (singleton) TaskVersion(value string) option {
+	return func(this *configuration) { this.TaskVersion = value }
+}
+func (singleton) TaskFactory(value TaskFactory) option {
+	return func(this *configuration) { this.TaskFactory = value }
 }
 func (singleton) Logger(value Logger) option {
 	return func(this *configuration) { this.Logger = value }
@@ -54,7 +47,9 @@ func (singleton) defaults(options ...option) []option {
 		Options.Context(context.Background()),
 		Options.WatchTerminateSignals(syscall.SIGINT, syscall.SIGTERM),
 		Options.WatchReloadSignals(syscall.SIGHUP),
-		Options.Task("", "", noop.Factory),
+		Options.TaskName("unknown"),
+		Options.TaskVersion("unknown"),
+		Options.TaskFactory(noop.Factory),
 		Options.Logger(noop),
 	}, options...)
 }
@@ -65,7 +60,8 @@ type configuration struct {
 	Context          context.Context
 	TerminateSignals []os.Signal
 	ReloadSignals    []os.Signal
-	TaskBanner       string
+	TaskName         string
+	TaskVersion      string
 	TaskFactory      TaskFactory
 	Logger           Logger
 }

@@ -12,7 +12,8 @@ import (
 type defaultRunner struct {
 	ctx         context.Context
 	shutdown    context.CancelFunc
-	taskBanner  string
+	taskName    string
+	taskVersion string
 	taskFactory TaskFactory
 	waiter      *sync.WaitGroup
 	ready       chan bool
@@ -33,7 +34,8 @@ func newRunner(config configuration) Runner {
 	return &defaultRunner{
 		ctx:         ctx,
 		shutdown:    shutdown,
-		taskBanner:  config.TaskBanner,
+		taskName:    config.TaskName,
+		taskVersion: config.TaskVersion,
 		taskFactory: config.TaskFactory,
 		waiter:      &sync.WaitGroup{},
 		ready:       make(chan bool, 16),
@@ -44,7 +46,7 @@ func newRunner(config configuration) Runner {
 }
 
 func (this *defaultRunner) Listen() {
-	this.logger.Printf("[INFO] Running configured task [%s]...", this.taskBanner)
+	this.logger.Printf("[INFO] Running configured task [%s] at version [%s]...", this.taskName, this.taskVersion)
 	defer this.cleanup()
 
 	this.waiter.Add(1)
