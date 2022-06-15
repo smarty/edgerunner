@@ -100,7 +100,12 @@ func (this *defaultRunner) run(active ListenCloser) ListenCloser {
 	case readyState := <-this.ready:
 		this.drainChannel()
 		if readyState {
-			this.logger.Printf("[INFO] Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", this.identifier)
+			if this.identifier > 1 {
+				this.logger.Printf("[INFO] Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", this.identifier)
+			} else {
+				this.logger.Printf("[INFO] Pending task [%d] has arrived at a ready state.", this.identifier)
+			}
+
 			closeResource(active)
 			return pending
 		} else {
