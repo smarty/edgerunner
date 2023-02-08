@@ -59,7 +59,7 @@ func (this *defaultRunner) Listen() {
 func (this *defaultRunner) listen() {
 	var active ListenCloser
 
-	// ensure that we close the ***CURRENT*** active instance at conclusion of method
+	// this ensure that we close the ***CURRENT*** active instance at conclusion of method
 	defer func() { closeResource(active) }()
 
 	for {
