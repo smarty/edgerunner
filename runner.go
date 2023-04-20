@@ -69,7 +69,7 @@ func (this *defaultRunner) listen() {
 		case <-this.ctx.Done():
 			return
 		case value := <-this.reload:
-			this.logger.Printf("[INFO] Received OS reload signal [%s], instructing runner to reload configured task...", value)
+			this.logger.Printf("[INFO] Received OS reload signal [%v], instructing runner to reload configured task...", value)
 			continue
 		}
 	}
@@ -124,7 +124,7 @@ func (this *defaultRunner) awaitTerminate() {
 	select {
 	case <-this.ctx.Done():
 	case value := <-this.terminate:
-		this.logger.Printf("[INFO] Received OS terminate signal [%s], shutting down runner along with any associated task(s)...", value)
+		this.logger.Printf("[INFO] Received OS terminate signal [%v], shutting down runner along with any associated task(s)...", value)
 		this.shutdown()
 	}
 }
