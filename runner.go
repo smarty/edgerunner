@@ -3,7 +3,6 @@ package edgerunner
 import (
 	"context"
 	"io"
-	"sync"
 )
 
 type defaultRunner struct {
@@ -12,7 +11,6 @@ type defaultRunner struct {
 	taskName    string
 	taskVersion string
 	taskFactory TaskFactory
-	waiter      *sync.WaitGroup
 	identifier  int
 	logger      Logger
 }
@@ -26,7 +24,6 @@ func newRunner(config configuration) Runner {
 		taskVersion: config.TaskVersion,
 		taskFactory: config.TaskFactory,
 		logger:      config.Logger,
-		waiter:      &sync.WaitGroup{},
 	}
 }
 
