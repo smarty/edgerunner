@@ -37,10 +37,7 @@ func (this *defaultRunner) Reload() {
 }
 func (this *defaultRunner) Listen() {
 	this.logger.Printf("[INFO] Running configured task [%s] at version [%s]...", this.taskName, this.taskVersion)
-	defer func() {
-		this.cancel() // just in case no one else has called it
-		this.logger.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
-	}()
+	defer this.logger.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
 
 	this.identifier++
 
