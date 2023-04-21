@@ -79,4 +79,4 @@ func (this *nop) Factory(int, chan<- bool) Task { return this }
 func (*nop) Initialize(context.Context) error { return nil }
 func (*nop) Listen()                          {}
 func (*nop) Close() error                     { return nil }
-func (*nop) Printf(string, ...interface{})    {}
+func (*nop) Printf(string, ...any)            {}
