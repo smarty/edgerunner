@@ -3,160 +3,69 @@ package edgerunner
 import (
 	"context"
 	"io"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 )
 
 type defaultRunner struct {
 	ctx         context.Context
-	shutdown    context.CancelFunc
+	cancel      context.CancelFunc
 	taskName    string
 	taskVersion string
 	taskFactory TaskFactory
 	waiter      *sync.WaitGroup
-	ready       chan bool
-	terminate   chan os.Signal
-	reload      chan os.Signal
 	identifier  int
 	logger      Logger
 }
 
 func newRunner(config configuration) Runner {
-	ctx, shutdown := context.WithCancel(config.Context)
-
-	terminate := make(chan os.Signal, 16)
-	reload := make(chan os.Signal, 16)
-	signal.Notify(terminate, config.TerminateSignals...)
-	signal.Notify(reload, config.ReloadSignals...)
-
+	ctx, cancel := context.WithCancel(config.Context)
 	return &defaultRunner{
 		ctx:         ctx,
-		shutdown:    shutdown,
+		cancel:      cancel,
 		taskName:    config.TaskName,
 		taskVersion: config.TaskVersion,
 		taskFactory: config.TaskFactory,
-		waiter:      &sync.WaitGroup{},
-		ready:       make(chan bool, 16),
-		terminate:   terminate,
-		reload:      reload,
 		logger:      config.Logger,
+		waiter:      &sync.WaitGroup{},
 	}
-}
-
-func (this *defaultRunner) Listen() {
-	this.logger.Printf("[INFO] Running configured task [%s] at version [%s]...", this.taskName, this.taskVersion)
-	defer this.cleanup()
-
-	this.waiter.Add(1)
-	defer this.waiter.Wait()
-
-	go this.awaitTerminate()
-	go this.awaitShutdown()
-	go this.listen()
-}
-func (this *defaultRunner) listen() {
-	var active ListenCloser
-
-	// this ensures that we close the ***CURRENT*** active instance at conclusion of method
-	defer func() { closeResource(active) }()
-
-	for {
-		active = this.run(active)
-
-		select {
-		case <-this.ctx.Done():
-			return
-		case value := <-this.reload:
-			this.logger.Printf("[INFO] Received OS reload signal [%v], instructing runner to reload configured task...", value)
-			continue
-		}
-	}
-}
-func (this *defaultRunner) run(active ListenCloser) ListenCloser {
-	this.identifier++
-
-	pending := this.taskFactory(this.identifier, this.ready)
-	if pending == nil {
-		this.logger.Printf("[WARN] No task created for ID [%d].", this.identifier)
-		return active
-	} else if err := pending.Initialize(this.ctx); err != nil {
-		this.logger.Printf("[WARN] Unable to initialize task [%d]: %s", this.identifier, err)
-		closeResource(pending)
-		return active
-	}
-
-	this.waiter.Add(1)
-	go func() {
-		defer this.waiter.Done()
-		pending.Listen()
-	}()
-
-	select {
-	case <-this.ctx.Done():
-		closeResource(pending)
-		return active
-	case readyState := <-this.ready:
-		this.drainChannel()
-		if readyState {
-			if this.identifier > 1 {
-				this.logger.Printf("[INFO] Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", this.identifier)
-			} else {
-				this.logger.Printf("[INFO] Pending task [%d] has arrived at a ready state.", this.identifier)
-			}
-
-			closeResource(active)
-			return pending
-		} else {
-			this.logger.Printf("[WARN] Pending task [%d] did not arrive at a ready state; continuing with previous task, if any.", this.identifier)
-			closeResource(pending)
-			return active
-		}
-	}
-}
-func (this *defaultRunner) drainChannel() {
-	for i := 0; i < len(this.ready); i++ {
-		<-this.ready
-	}
-}
-func (this *defaultRunner) awaitTerminate() {
-	select {
-	case <-this.ctx.Done():
-	case value := <-this.terminate:
-		this.logger.Printf("[INFO] Received OS terminate signal [%v], shutting down runner along with any associated task(s)...", value)
-		this.shutdown()
-	}
-}
-func (this *defaultRunner) awaitShutdown() {
-	<-this.ctx.Done()
-	this.waiter.Done()
-}
-func (this *defaultRunner) cleanup() {
-	this.shutdown()
-	signal.Stop(this.terminate)
-	signal.Stop(this.reload)
-	close(this.terminate)
-	close(this.reload)
-	close(this.ready)
-	this.logger.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
 }
 
 func (this *defaultRunner) Close() error {
 	this.logger.Printf("[INFO] Request to close runner received, shutting down runner along with any associated task(s)...")
-	this.shutdown()
+	this.cancel()
 	return nil
 }
 func (this *defaultRunner) Reload() {
-	if len(this.reload) > 0 {
+	panic("NOT YET IMPLEMENTED") // TODO
+}
+func (this *defaultRunner) Listen() {
+	this.logger.Printf("[INFO] Running configured task [%s] at version [%s]...", this.taskName, this.taskVersion)
+	defer func() {
+		this.cancel() // just in case no one else has called it
+		this.logger.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
+	}()
+
+	this.identifier++
+
+	task := this.taskFactory(this.identifier, nil) // TODO: pass ready channel
+	if task == nil {
+		this.logger.Printf("[WARN] No task created for ID [%d].", this.identifier)
 		return
 	}
 
-	select {
-	case <-this.ctx.Done(): // shutting down, don't reload
-	case this.reload <- syscall.Signal(0):
-	default: // buffer full, don't send more
+	err := task.Initialize(this.ctx)
+	if err != nil {
+		this.logger.Printf("[WARN] Unable to initialize task [%d]: %s", this.identifier, err)
+		closeResource(task)
+		return
 	}
+
+	go func() {
+		<-this.ctx.Done()
+		closeResource(task)
+	}()
+
+	task.Listen()
 }
 
 func closeResource(resource io.Closer) {

@@ -2,6 +2,7 @@ package edgerunner
 
 import (
 	"context"
+	"log"
 	"os"
 	"syscall"
 )
@@ -42,15 +43,14 @@ func (singleton) apply(options ...option) option {
 	}
 }
 func (singleton) defaults(options ...option) []option {
-	noop := &nop{}
 	return append([]option{
 		Options.Context(context.Background()),
 		Options.WatchTerminateSignals(syscall.SIGINT, syscall.SIGTERM),
 		Options.WatchReloadSignals(syscall.SIGHUP),
 		Options.TaskName("unknown"),
 		Options.TaskVersion("unknown"),
-		Options.TaskFactory(noop.Factory),
-		Options.Logger(noop),
+		Options.TaskFactory(func(id int, ready chan<- bool) Task { return nil }),
+		Options.Logger(log.Default()),
 	}, options...)
 }
 
@@ -69,14 +69,3 @@ type option func(*configuration)
 type singleton struct{}
 
 var Options singleton
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-type nop struct{}
-
-func (this *nop) Factory(int, chan<- bool) Task { return this }
-
-func (*nop) Initialize(context.Context) error { return nil }
-func (*nop) Listen()                          {}
-func (*nop) Close() error                     { return nil }
-func (*nop) Printf(string, ...any)            {}
