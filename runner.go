@@ -50,7 +50,8 @@ func (this *defaultRunner) listenAll(waiters chan func()) {
 		case value := <-this.reloads:
 			this.log.Printf("[INFO] Received OS reload signal [%v], instructing runner to reload configured task...", value)
 			continue
-		case <-this.terminations:
+		case value := <-this.terminations:
+			this.log.Printf("[INFO] Received OS terminate signal [%v], shutting down runner along with any associated task(s)...", value)
 			this.cancel()
 			return
 		case <-this.context.Done():
