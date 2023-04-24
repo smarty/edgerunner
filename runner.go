@@ -2,6 +2,7 @@ package edgerunner
 
 import (
 	"io"
+	"os/signal"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -9,21 +10,16 @@ import (
 
 type defaultRunner struct {
 	configuration
-	ready      chan bool
-	waiters    chan func()
-	identifier *atomic.Int32
-	task       Task
+	id   *atomic.Int32
+	task Task
 }
 
 func newRunner(configuration configuration) Runner {
 	return &defaultRunner{
 		configuration: configuration,
-		ready:         make(chan bool, 16),
-		waiters:       make(chan func()),
-		identifier:    new(atomic.Int32),
+		id:            new(atomic.Int32),
 	}
 }
-
 func (this *defaultRunner) Close() error {
 	this.log.Printf("[INFO] Request to close runner received, shutting down runner along with any associated task(s)...")
 	this.cancel()
@@ -34,23 +30,21 @@ func (this *defaultRunner) Reload() {
 }
 func (this *defaultRunner) Listen() {
 	this.log.Printf("[INFO] Running configured task [%s] at version [%s]...", this.name, this.version)
-
-	go this.listenAll()
-
-	for wait := range this.waiters {
-		wait()
+	waiters := make(chan func())
+	go this.listenAll(waiters)
+	for wait := range waiters {
+		if wait != nil {
+			wait()
+		}
 	}
-
+	signal.Stop(this.terminations)
+	signal.Stop(this.reloads)
 	this.log.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
 }
-func (this *defaultRunner) listenAll() {
-	defer close(this.waiters)
+func (this *defaultRunner) listenAll(waiters chan func()) {
+	defer close(waiters)
 	for {
-		id, next := this.prepareNextTask()
-		if next != nil {
-			this.waiters <- this.start(id, next, this.task)
-			this.task = next
-		}
+		waiters <- this.startNextTask(this.task)
 
 		select {
 		case value := <-this.reloads:
@@ -63,38 +57,37 @@ func (this *defaultRunner) listenAll() {
 		}
 	}
 }
-func (this *defaultRunner) prepareNextTask() (int, Task) {
-	this.identifier.Add(1)
-	id := int(this.identifier.Load())
-	task := this.factory(id, this.ready)
-	if task == nil {
+func (this *defaultRunner) startNextTask(older Task) (wait func()) {
+	id := int(this.id.Add(1))
+	ready := make(chan bool, 16)
+	newer := this.factory(id, ready)
+	if newer == nil {
 		this.log.Printf("[WARN] No task created for ID [%d].", id)
-		return 0, nil
+		return nil
 	}
 
-	err := task.Initialize(this.context)
+	err := newer.Initialize(this.context)
 	if err != nil {
 		this.log.Printf("[WARN] Unable to initialize task [%d]: %s", id, err)
-		this.closeResource(task)
-		return 0, nil
+		closeResource(newer)
+		return nil
 	}
 
-	return id, task
-}
-func (this *defaultRunner) start(id int, newer, older Task) (wait func()) {
+	this.task = newer
+
 	return awaitAll(
 		func() { newer.Listen() },
-		func() { defer this.closeResource(newer); <-this.context.Done() },
+		func() { defer closeResource(newer); <-this.context.Done() },
 		func() {
 			select {
 			case <-this.context.Done():
-			case newerIsReady := <-this.ready: // TODO: drain ready? (or maybe just make per-task readiness channels, with the understanding that we'll only ever use the first value)
+			case newerIsReady := <-ready:
 				if newerIsReady {
 					this.log.Printf("[INFO] Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", id)
-					this.closeResource(older)
+					closeResource(older)
 				} else {
 					this.log.Printf("[WARN] Pending task [%d] did not arrive at a ready state; continuing with previous task, if any.", id)
-					this.closeResource(newer)
+					closeResource(newer)
 				}
 			}
 		},
@@ -111,10 +104,7 @@ func awaitAll(actions ...func()) (wait func()) {
 	}
 	return waiter.Wait
 }
-func (this *defaultRunner) closeResource(resource io.Closer) {
-	//this.Logger.Printf("closing resource: %v", resource)
-	//dump := debug.Stack()
-	//this.Logger.Printf("stack:\n%s", string(dump))
+func closeResource(resource io.Closer) {
 	if resource != nil {
 		_ = resource.Close()
 	}
