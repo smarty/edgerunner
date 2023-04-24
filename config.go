@@ -15,7 +15,7 @@ func New(options ...option) Runner {
 }
 
 func (singleton) Context(value context.Context) option {
-	return func(this *configuration) { this.Context, this.cancel = context.WithCancel(value) }
+	return func(this *configuration) { this.context, this.cancel = context.WithCancel(value) }
 }
 func (singleton) WatchTerminateSignals(values ...os.Signal) option {
 	return func(this *configuration) {
@@ -30,16 +30,16 @@ func (singleton) WatchReloadSignals(values ...os.Signal) option {
 	}
 }
 func (singleton) TaskName(value string) option {
-	return func(this *configuration) { this.TaskName = value }
+	return func(this *configuration) { this.name = value }
 }
 func (singleton) TaskVersion(value string) option {
-	return func(this *configuration) { this.TaskVersion = value }
+	return func(this *configuration) { this.version = value }
 }
 func (singleton) TaskFactory(value TaskFactory) option {
-	return func(this *configuration) { this.TaskFactory = value }
+	return func(this *configuration) { this.factory = value }
 }
 func (singleton) Logger(value Logger) option {
-	return func(this *configuration) { this.Logger = value }
+	return func(this *configuration) { this.log = value }
 }
 
 func (singleton) apply(options ...option) option {
@@ -64,14 +64,14 @@ func (singleton) defaults(options ...option) []option {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type configuration struct {
-	Context      context.Context
+	context      context.Context
 	cancel       context.CancelFunc
 	reloads      chan os.Signal
 	terminations chan os.Signal
-	TaskName     string
-	TaskVersion  string
-	TaskFactory  TaskFactory
-	Logger       Logger
+	name         string
+	version      string
+	factory      TaskFactory
+	log          Logger
 }
 
 type option func(*configuration)

@@ -12,7 +12,7 @@ type defaultRunner struct {
 	ready   chan bool
 	waiters chan func()
 	counter *atomic.Int32
-	running Task
+	task    Task
 }
 
 func newRunner(configuration configuration) Runner {
@@ -25,7 +25,7 @@ func newRunner(configuration configuration) Runner {
 }
 
 func (this *defaultRunner) Close() error {
-	this.Logger.Printf("[INFO] Request to close runner received, shutting down runner along with any associated task(s)...")
+	this.log.Printf("[INFO] Request to close runner received, shutting down runner along with any associated task(s)...")
 	this.cancel()
 	return nil
 }
@@ -33,7 +33,7 @@ func (this *defaultRunner) Reload() {
 	this.reloads <- syscall.Signal(0)
 }
 func (this *defaultRunner) Listen() {
-	this.Logger.Printf("[INFO] Running configured task [%s] at version [%s]...", this.TaskName, this.TaskVersion)
+	this.log.Printf("[INFO] Running configured task [%s] at version [%s]...", this.name, this.version)
 
 	go this.listenAll()
 
@@ -41,7 +41,7 @@ func (this *defaultRunner) Listen() {
 		wait()
 	}
 
-	this.Logger.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
+	this.log.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
 }
 func (this *defaultRunner) listenAll() {
 	defer close(this.waiters)
@@ -50,7 +50,7 @@ func (this *defaultRunner) listenAll() {
 		id := int(this.counter.Load())
 
 		if next := this.prepareNextTask(id); next != nil {
-			this.waiters <- this.start(id, next, this.running)
+			this.waiters <- this.start(id, next, this.task)
 		}
 
 		select {
@@ -58,21 +58,21 @@ func (this *defaultRunner) listenAll() {
 			continue
 		case <-this.terminations:
 			return
-		case <-this.Context.Done():
+		case <-this.context.Done():
 			return
 		}
 	}
 }
 func (this *defaultRunner) prepareNextTask(id int) Task {
-	next := this.TaskFactory(id, this.ready)
+	next := this.factory(id, this.ready)
 	if next == nil {
-		this.Logger.Printf("[WARN] No task created for ID [%d].", id)
+		this.log.Printf("[WARN] No task created for ID [%d].", id)
 		return nil
 	}
 
-	err := next.Initialize(this.Context)
+	err := next.Initialize(this.context)
 	if err != nil {
-		this.Logger.Printf("[WARN] Unable to initialize task [%d]: %s", id, err)
+		this.log.Printf("[WARN] Unable to initialize task [%d]: %s", id, err)
 		this.closeResource(next)
 		return nil
 	}
@@ -80,19 +80,19 @@ func (this *defaultRunner) prepareNextTask(id int) Task {
 	return next
 }
 func (this *defaultRunner) start(id int, newer, older Task) (wait func()) {
-	this.running = newer
+	this.task = newer
 	return awaitAll(
 		func() { newer.Listen() },
-		func() { defer this.closeResource(newer); <-this.Context.Done() },
+		func() { defer this.closeResource(newer); <-this.context.Done() },
 		func() {
 			select {
-			case <-this.Context.Done():
+			case <-this.context.Done():
 			case newerIsReady := <-this.ready: // TODO: drain ready.. (maybe make per-task readiness channels)
 				if newerIsReady {
-					this.Logger.Printf("[INFO] Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", id)
+					this.log.Printf("[INFO] Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", id)
 					this.closeResource(older)
 				} else {
-					this.Logger.Printf("[WARN] Pending task [%d] did not arrive at a ready state; continuing with previous task, if any.", id)
+					this.log.Printf("[WARN] Pending task [%d] did not arrive at a ready state; continuing with previous task, if any.", id)
 					this.closeResource(newer)
 				}
 			}
