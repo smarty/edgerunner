@@ -53,7 +53,8 @@ func (this *defaultRunner) listenAll() {
 		}
 
 		select {
-		case <-this.reloads:
+		case value := <-this.reloads:
+			this.log.Printf("[INFO] Received OS reload signal [%v], instructing runner to reload configured task...", value)
 			continue
 		case <-this.terminations:
 			return
