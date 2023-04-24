@@ -9,10 +9,10 @@ import (
 
 type defaultRunner struct {
 	configuration
-	ready   chan bool
-	waiters chan func()
-	counter *atomic.Int32
-	task    Task
+	ready      chan bool
+	waiters    chan func()
+	identifier *atomic.Int32
+	task       Task
 }
 
 func newRunner(configuration configuration) Runner {
@@ -20,7 +20,7 @@ func newRunner(configuration configuration) Runner {
 		configuration: configuration,
 		ready:         make(chan bool, 16),
 		waiters:       make(chan func()),
-		counter:       new(atomic.Int32),
+		identifier:    new(atomic.Int32),
 	}
 }
 
@@ -46,11 +46,10 @@ func (this *defaultRunner) Listen() {
 func (this *defaultRunner) listenAll() {
 	defer close(this.waiters)
 	for {
-		this.counter.Add(1)
-		id := int(this.counter.Load())
-
-		if next := this.prepareNextTask(id); next != nil {
+		id, next := this.prepareNextTask()
+		if next != nil {
 			this.waiters <- this.start(id, next, this.task)
+			this.task = next
 		}
 
 		select {
@@ -63,31 +62,32 @@ func (this *defaultRunner) listenAll() {
 		}
 	}
 }
-func (this *defaultRunner) prepareNextTask(id int) Task {
-	next := this.factory(id, this.ready)
-	if next == nil {
+func (this *defaultRunner) prepareNextTask() (int, Task) {
+	this.identifier.Add(1)
+	id := int(this.identifier.Load())
+	task := this.factory(id, this.ready)
+	if task == nil {
 		this.log.Printf("[WARN] No task created for ID [%d].", id)
-		return nil
+		return 0, nil
 	}
 
-	err := next.Initialize(this.context)
+	err := task.Initialize(this.context)
 	if err != nil {
 		this.log.Printf("[WARN] Unable to initialize task [%d]: %s", id, err)
-		this.closeResource(next)
-		return nil
+		this.closeResource(task)
+		return 0, nil
 	}
 
-	return next
+	return id, task
 }
 func (this *defaultRunner) start(id int, newer, older Task) (wait func()) {
-	this.task = newer
 	return awaitAll(
 		func() { newer.Listen() },
 		func() { defer this.closeResource(newer); <-this.context.Done() },
 		func() {
 			select {
 			case <-this.context.Done():
-			case newerIsReady := <-this.ready: // TODO: drain ready.. (maybe make per-task readiness channels)
+			case newerIsReady := <-this.ready: // TODO: drain ready? (or maybe just make per-task readiness channels, with the understanding that we'll only ever use the first value)
 				if newerIsReady {
 					this.log.Printf("[INFO] Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", id)
 					this.closeResource(older)
