@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
 	"syscall"
 )
 
@@ -14,13 +15,19 @@ func New(options ...option) Runner {
 }
 
 func (singleton) Context(value context.Context) option {
-	return func(this *configuration) { this.Context = value }
+	return func(this *configuration) { this.Context, this.cancel = context.WithCancel(value) }
 }
 func (singleton) WatchTerminateSignals(values ...os.Signal) option {
-	return func(this *configuration) { this.TerminateSignals = values }
+	return func(this *configuration) {
+		this.terminations = make(chan os.Signal, 16)
+		signal.Notify(this.terminations, values...)
+	}
 }
 func (singleton) WatchReloadSignals(values ...os.Signal) option {
-	return func(this *configuration) { this.ReloadSignals = values }
+	return func(this *configuration) {
+		this.reloads = make(chan os.Signal, 16)
+		signal.Notify(this.reloads, values...)
+	}
 }
 func (singleton) TaskName(value string) option {
 	return func(this *configuration) { this.TaskName = value }
@@ -57,14 +64,16 @@ func (singleton) defaults(options ...option) []option {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type configuration struct {
-	Context          context.Context
-	TerminateSignals []os.Signal
-	ReloadSignals    []os.Signal
-	TaskName         string
-	TaskVersion      string
-	TaskFactory      TaskFactory
-	Logger           Logger
+	Context      context.Context
+	cancel       context.CancelFunc
+	reloads      chan os.Signal
+	terminations chan os.Signal
+	TaskName     string
+	TaskVersion  string
+	TaskFactory  TaskFactory
+	Logger       Logger
 }
+
 type option func(*configuration)
 type singleton struct{}
 

@@ -1,10 +1,7 @@
 package edgerunner
 
 import (
-	"context"
 	"io"
-	"os"
-	"os/signal"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -12,27 +9,15 @@ import (
 
 type defaultRunner struct {
 	configuration
-	cancel       context.CancelFunc
-	ready        chan bool
-	reloads      chan os.Signal
-	terminations chan os.Signal
-	waiters      chan func()
-	counter      *atomic.Int32
-	running      Task
+	ready   chan bool
+	waiters chan func()
+	counter *atomic.Int32
+	running Task
 }
 
-func newRunner(config configuration) Runner {
-	ctx, cancel := context.WithCancel(config.Context) // TODO: Move to config.go
-	config.Context = ctx
-	reloads := make(chan os.Signal, 16)
-	terminations := make(chan os.Signal, 16)
-	signal.Notify(reloads, config.ReloadSignals...)
-	signal.Notify(terminations, config.TerminateSignals...)
+func newRunner(configuration configuration) Runner {
 	return &defaultRunner{
-		configuration: config,
-		cancel:        cancel,
-		reloads:       reloads,
-		terminations:  terminations,
+		configuration: configuration,
 		ready:         make(chan bool, 16),
 		waiters:       make(chan func()),
 		counter:       new(atomic.Int32),
