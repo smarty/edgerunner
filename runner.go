@@ -33,9 +33,7 @@ func (this *defaultRunner) Listen() {
 	waiters := make(chan func())
 	go this.listenAll(waiters)
 	for wait := range waiters {
-		if wait != nil {
-			wait()
-		}
+		wait()
 	}
 	signal.Stop(this.terminations)
 	signal.Stop(this.reloads)
