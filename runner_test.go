@@ -26,8 +26,7 @@ type Fixture struct {
 	testDefaults []option
 }
 
-func (this *Fixture) allowForInitialization() { time.Sleep(time.Second) }
-func (this *Fixture) allowForFinalization()   { time.Sleep(time.Second) }
+func (this *Fixture) delay() { time.Sleep(time.Second) }
 
 func (this *Fixture) NewRunner(options ...option) Runner {
 	return New(append(this.testDefaults, options...)...)
@@ -46,7 +45,9 @@ func (this *Fixture) Setup() {
 	}
 }
 func (this *Fixture) TestNilTask_Nop() {
-	this.NewRunner().Listen() // essentially a no-op, should not block
+	runner := this.NewRunner()
+	go func() { _ = runner.Close() }()
+	runner.Listen()
 }
 func (this *Fixture) TestTask_InitializationError() {
 	task := NewTestingTask(this.taskLog)
@@ -58,7 +59,7 @@ func (this *Fixture) TestTask_InitializationError() {
 
 	go runner.Listen()
 
-	this.allowForInitialization()
+	this.delay()
 	this.So(task.initialized.Load(), should.Equal, 1)
 	this.So(task.listened.Load(), should.Equal, 0)
 	this.So(task.closed.Load(), should.Equal, 1)
@@ -71,11 +72,11 @@ func (this *Fixture) TestTask_Initialized_Listened_Closed() {
 
 	go runner.Listen()
 
-	this.allowForInitialization()
+	this.delay()
 	this.So(task.initialized.Load(), should.Equal, 1)
 
 	_ = runner.Close()
-	this.allowForFinalization()
+	this.delay()
 	this.So(task.listened.Load(), should.Equal, 1)
 	this.So(task.closed.Load(), should.Equal, 1)
 }
