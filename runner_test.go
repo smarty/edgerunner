@@ -64,7 +64,7 @@ func (this *Fixture) Setup() {
 	this.ctx = context.WithValue(context.Background(), "name", this.Name())
 }
 func (this *Fixture) TestNilTask_Nop_NonBlockingAfterClose() {
-	runner := this.NewRunner()
+	runner := New(Options.Logger(NewTestLogger(this.T(), "EDGE")))
 	go delayedClose(1, runner)
 	this.Listen(runner)
 }
