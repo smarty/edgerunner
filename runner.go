@@ -51,6 +51,7 @@ func (this *defaultRunner) listenAll(waiters chan func()) {
 			this.log.Printf("[INFO] Received OS reload signal [%v], instructing runner to reload configured task...", value)
 			continue
 		case <-this.terminations:
+			this.cancel()
 			return
 		case <-this.context.Done():
 			return

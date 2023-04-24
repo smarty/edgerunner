@@ -97,6 +97,8 @@ func (this *Fixture) TestTask_Initialized_Listened_Closed() {
 func (this *Fixture) TestReload() {
 	task1 := NewTestingTask(NewTestLogger(this.T(), "TASK-1"))
 	task2 := NewTestingTask(NewTestLogger(this.T(), "TASK-2"))
+	task1.readiness = prepared()
+
 	runner := this.NewRunner()
 
 	go func() {
@@ -146,4 +148,20 @@ func (this *Fixture) TestSubsequentTaskFailsReadinessCheck_ClosedImmediately_Pre
 	this.So(task2.initialized.Load(), should.Equal, 1)
 	this.So(task2.listened.Load(), should.Equal, 1)
 	this.So(task2.closed.Load(), should.Equal, 2)
+}
+func (this *Fixture) TestTerminate() {
+	task := NewTestingTask(NewTestLogger(this.T(), "TASK"))
+
+	runner := this.NewRunner()
+	go func() {
+		time.Sleep(delay())
+		runner.(*defaultRunner).terminations <- syscall.Signal(0)
+		time.Sleep(delay())
+	}()
+	this.Listen(runner, task)
+
+	this.So(task.id, should.Equal, 1)
+	this.So(task.initialized.Load(), should.Equal, 1)
+	this.So(task.listened.Load(), should.Equal, 1)
+	this.So(task.closed.Load(), should.Equal, 1)
 }
