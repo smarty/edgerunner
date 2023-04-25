@@ -9,88 +9,65 @@ import (
 )
 
 type defaultRunner struct {
-	config
+	configuration
 	id   *atomic.Int32
 	task Task
 }
 
-func newRunner(config config) Runner {
-	return &defaultRunner{
-		config: config,
-		id:     new(atomic.Int32),
-	}
+func newRunner(config configuration) Runner {
+	runner := &defaultRunner{id: new(atomic.Int32)}
+	runner.configuration = config
+	return runner
 }
-func (this *defaultRunner) Close() error {
-	this.log.Printf("[INFO] Request to close runner received, shutting down runner along with any associated task(s)...")
-	this.cancel()
-	return nil
-}
-func (this *defaultRunner) Reload() {
-	select {
-	case <-this.context.Done(): // already shut down
-	case this.reloads <- syscall.Signal(0):
-	default: // reloads chan may be full
-	}
-}
+
 func (this *defaultRunner) Listen() {
 	this.log.Printf("[INFO] Running configured task [%s] at version [%s]...", this.name, this.version)
-	this.listen()
-	signal.Stop(this.terminations)
-	signal.Stop(this.reloads)
+	awaitAll(this.goCoordinateTaskWithSignals())
 	this.log.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
 }
-
-func (this *defaultRunner) listen() {
-	var final sync.WaitGroup
+func (this *defaultRunner) goCoordinateTaskWithSignals() chan func() {
 	tasks := make(chan func())
-	go this.listenAll(tasks)
-	for task := range tasks {
-		if task != nil {
-			final.Add(1)
-			go act(task, final.Done)
-		}
-	}
-	final.Wait()
-}
-func (this *defaultRunner) listenAll(waiters chan func()) {
-	defer close(waiters)
-	for {
-		waiters <- this.startNextTask(this.task)
+	go func() {
+		defer close(tasks)
+		for {
+			tasks <- this.startNextTask(this.task)
 
-		select {
-		case value := <-this.reloads:
-			this.log.Printf("[INFO] Received OS reload signal [%v], instructing runner to reload configured task...", value)
-			continue
-		case value := <-this.terminations:
-			this.log.Printf("[INFO] Received OS terminate signal [%v], shutting down runner along with any associated task(s)...", value)
-			this.cancel()
-			return
-		case <-this.context.Done():
-			return
+			select {
+			case value := <-this.reloads:
+				this.log.Printf("[INFO] Received OS reload signal [%v], instructing runner to reload configured task...", value)
+				continue
+			case value := <-this.terminations:
+				this.log.Printf("[INFO] Received OS terminate signal [%v], shutting down runner along with any associated task(s)...", value)
+				this.cancel()
+				return
+			case <-this.context.Done():
+				return
+			}
 		}
-	}
+	}()
+	return tasks
 }
-func (this *defaultRunner) startNextTask(older Task) (wait func()) {
+func (this *defaultRunner) startNextTask(older Task) (task func()) {
 	id := int(this.id.Add(1))
 	ready := make(chan bool, 16)
-	newer := this.factory(id, ready)
-	if newer == nil {
+	next := this.factory(id, ready)
+	if next == nil {
 		this.log.Printf("[WARN] No task created for ID [%d].", id)
 		return nil
 	}
 
-	err := newer.Initialize(this.context)
+	err := next.Initialize(this.context)
 	if err != nil {
 		this.log.Printf("[WARN] Unable to initialize task [%d]: %s", id, err)
-		closeResource(newer)
+		closeResource(next)
 		return nil
 	}
 
-	this.task = newer
+	this.task = next
 
-	return awaitAll(
-		func() { newer.Listen() },
-		func() { defer closeResource(newer); <-this.context.Done() },
+	return prepareWaiter(load(
+		func() { next.Listen() },
+		func() { defer closeResource(next); <-this.context.Done() },
 		func() {
 			select {
 			case <-this.context.Done():
@@ -100,28 +77,59 @@ func (this *defaultRunner) startNextTask(older Task) (wait func()) {
 					closeResource(older)
 				} else {
 					this.log.Printf("[WARN] Pending task [%d] did not arrive at a ready state; continuing with previous task, if any.", id)
-					closeResource(newer)
+					closeResource(next)
 				}
 			}
 		},
-	)
+	))
 }
 
-func awaitAll(actions ...func()) (wait func()) {
-	var waiter sync.WaitGroup
-	for _, action := range actions {
-		waiter.Add(1)
-		go act(action, waiter.Done)
+func (this *defaultRunner) Reload() {
+	select {
+	case <-this.context.Done(): // already shut down
+	case this.reloads <- syscall.Signal(0):
+	default: // reloads chan may be full
 	}
-	return waiter.Wait
-}
-func act(action, done func()) {
-	defer done()
-	action()
 }
 
+func (this *defaultRunner) Close() error {
+	this.log.Printf("[INFO] Request to close runner received, shutting down runner along with any associated task(s)...")
+	this.cancel()
+	signal.Stop(this.terminations)
+	signal.Stop(this.reloads)
+	return nil
+}
 func closeResource(resource io.Closer) {
 	if resource != nil {
 		_ = resource.Close()
 	}
+}
+
+func load(items ...func()) chan func() {
+	output := make(chan func())
+	go func() {
+		defer close(output)
+		for _, item := range items {
+			output <- item
+		}
+	}()
+	return output
+}
+func awaitAll(actions chan func()) {
+	waiter := prepareWaiter(actions)
+	waiter()
+}
+func prepareWaiter(actions chan func()) (wait func()) {
+	var waiter sync.WaitGroup
+	for action := range actions {
+		if action != nil {
+			waiter.Add(1)
+			go do(action, waiter.Done)
+		}
+	}
+	return waiter.Wait
+}
+func do(action, done func()) {
+	defer done()
+	action()
 }
