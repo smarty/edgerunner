@@ -30,16 +30,23 @@ func (this *defaultRunner) Reload() {
 }
 func (this *defaultRunner) Listen() {
 	this.log.Printf("[INFO] Running configured task [%s] at version [%s]...", this.name, this.version)
+	this.listen()
+	signal.Stop(this.terminations)
+	signal.Stop(this.reloads)
+	this.log.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
+}
+
+func (this *defaultRunner) listen() {
+	var final sync.WaitGroup
 	waiters := make(chan func())
 	go this.listenAll(waiters)
 	for wait := range waiters {
 		if wait != nil {
-			wait()
+			final.Add(1)
+			go func(act, done func()) { defer done(); act() }(wait, final.Done)
 		}
 	}
-	signal.Stop(this.terminations)
-	signal.Stop(this.reloads)
-	this.log.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
+	final.Wait()
 }
 func (this *defaultRunner) listenAll(waiters chan func()) {
 	defer close(waiters)
