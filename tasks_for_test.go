@@ -43,6 +43,7 @@ func (this *TestingTask) identify(id int, ready chan<- bool) {
 	}
 }
 func (this *TestingTask) Listen() {
+	defer this.log.Printf("done listening")
 	defer this.listened.Add(1)
 	this.log.Printf("listening")
 	for {
