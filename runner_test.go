@@ -65,7 +65,7 @@ func (this *Fixture) Setup() {
 }
 func (this *Fixture) TestNilTask_Nop_NonBlockingAfterClose() {
 	runner := New(Options.Logger(NewTestLogger(this.T(), "EDGE")))
-	go delayedClose(1, runner)
+	go delayedClose(delay(), runner)
 	this.Listen(runner)
 }
 func (this *Fixture) TestTask_InitializationError() {
@@ -73,7 +73,7 @@ func (this *Fixture) TestTask_InitializationError() {
 	task.initErr = errors.New("BOINK")
 
 	runner := this.NewRunner()
-	go delayedClose(1, runner)
+	go delayedClose(delay(), runner)
 	this.Listen(runner, task)
 
 	time.Sleep(delay())
