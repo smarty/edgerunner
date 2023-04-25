@@ -9,15 +9,15 @@ import (
 )
 
 type defaultRunner struct {
-	configuration
+	config
 	id   *atomic.Int32
 	task Task
 }
 
-func newRunner(configuration configuration) Runner {
+func newRunner(config config) Runner {
 	return &defaultRunner{
-		configuration: configuration,
-		id:            new(atomic.Int32),
+		config: config,
+		id:     new(atomic.Int32),
 	}
 }
 func (this *defaultRunner) Close() error {
@@ -26,7 +26,11 @@ func (this *defaultRunner) Close() error {
 	return nil
 }
 func (this *defaultRunner) Reload() {
-	this.reloads <- syscall.Signal(0)
+	select {
+	case <-this.context.Done(): // already shut down
+	case this.reloads <- syscall.Signal(0):
+	default: // reloads chan may be full
+	}
 }
 func (this *defaultRunner) Listen() {
 	this.log.Printf("[INFO] Running configured task [%s] at version [%s]...", this.name, this.version)
@@ -38,12 +42,12 @@ func (this *defaultRunner) Listen() {
 
 func (this *defaultRunner) listen() {
 	var final sync.WaitGroup
-	waiters := make(chan func())
-	go this.listenAll(waiters)
-	for wait := range waiters {
-		if wait != nil {
+	tasks := make(chan func())
+	go this.listenAll(tasks)
+	for task := range tasks {
+		if task != nil {
 			final.Add(1)
-			go func(act, done func()) { defer done(); act() }(wait, final.Done)
+			go act(task, final.Done)
 		}
 	}
 	final.Wait()
@@ -102,17 +106,20 @@ func (this *defaultRunner) startNextTask(older Task) (wait func()) {
 		},
 	)
 }
+
 func awaitAll(actions ...func()) (wait func()) {
 	var waiter sync.WaitGroup
-	waiter.Add(len(actions))
 	for _, action := range actions {
-		go func(act func()) {
-			defer waiter.Done()
-			act()
-		}(action)
+		waiter.Add(1)
+		go act(action, waiter.Done)
 	}
 	return waiter.Wait
 }
+func act(action, done func()) {
+	defer done()
+	action()
+}
+
 func closeResource(resource io.Closer) {
 	if resource != nil {
 		_ = resource.Close()
