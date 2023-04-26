@@ -160,3 +160,30 @@ func (this *Fixture) TestTerminate() {
 	this.So(task.listened.Load(), should.Equal, 1)
 	this.So(task.closed.Load(), should.Equal, 1)
 }
+func (this *Fixture) TestReadinessTimeoutReached_TaskAborted() {
+	task1 := NewTaskForTests(NewTestLogger(this.T(), "TASK-1"))
+	task2 := NewTaskForTests(NewTestLogger(this.T(), "TASK-2"))
+	task1.readiness = prepared()
+
+	runner := this.NewRunner(Options.ReadinessTimeout(delay() / 2))
+	wait := prepareWaiter(load(func() {
+		wait := prepareWaiter(load(func() {
+			this.Listen(runner, task1, task2)
+		}))
+		runner.Reload()
+		time.Sleep(delay())
+		this.So(task1.closed.Load(), should.Equal, 0)
+
+		this.So(task2.initialized.Load(), should.Equal, 1)
+		this.So(task2.listened.Load(), should.Equal, 1)
+		this.So(task2.closed.Load(), should.Equal, 1)
+		wait()
+	}))
+
+	delayedClose(delay()*5, runner)
+	wait()
+
+	this.So(task2.initialized.Load(), should.Equal, 1)
+	this.So(task2.listened.Load(), should.Equal, 1)
+	this.So(task2.closed.Load(), should.Equal, 1)
+}

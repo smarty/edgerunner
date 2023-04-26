@@ -42,6 +42,9 @@ func (singleton) TaskFactory(value TaskFactory) option {
 func (singleton) Logger(value Logger) option {
 	return func(this *configuration) { this.log = value }
 }
+func (singleton) ReadinessTimeout(value time.Duration) option {
+	return func(this *configuration) { this.readinessTimeout = value }
+}
 
 func (singleton) apply(options ...option) option {
 	return func(this *configuration) {
@@ -59,6 +62,7 @@ func (singleton) defaults(options ...option) []option {
 		Options.TaskVersion("unknown"),
 		Options.TaskFactory(func(id int, ready chan<- bool) Task { return nil }),
 		Options.Logger(log.Default()),
+		Options.ReadinessTimeout(time.Hour),
 	}, options...)
 }
 
@@ -73,6 +77,7 @@ type configuration struct {
 	taskName           string
 	taskVersion        string
 	taskFactory        TaskFactory
+	readinessTimeout   time.Duration
 }
 
 type option func(*configuration)

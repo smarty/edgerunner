@@ -1,6 +1,7 @@
 package edgerunner
 
 import (
+	"context"
 	"io"
 	"os/signal"
 	"syscall"
@@ -51,9 +52,11 @@ func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 		return nil
 	}
 
+	ctx, release := context.WithTimeout(this.context, this.readinessTimeout)
 	err := task.Initialize(this.context)
 	if err != nil {
 		this.log.Printf("[WARN] Unable to initialize task [%d]: %s", id, err)
+		release()
 		closeResource(task)
 		return nil
 	}
@@ -63,11 +66,13 @@ func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 	this.task = newer
 
 	return prepareWaiter(load(
-		func() { task.Listen() },
+		func() { defer release(); task.Listen(); this.log.Printf("[INFO] Task [%d] is finished.", id) },
 		func() { defer closeResource(newer); <-this.context.Done() },
 		func() {
 			select {
-			case <-this.context.Done():
+			case <-ctx.Done():
+				this.log.Printf("[INFO] Pending task [%d] failed to report readiness before configured timeout of [%s]; continuing with previous task, if any.", id, this.readinessTimeout)
+				closeResource(newer)
 			case newerIsReady := <-ready:
 				if newerIsReady {
 					this.log.Printf("[INFO] Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", id)

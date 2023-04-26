@@ -31,9 +31,9 @@ func NewTaskForTests(logger Logger) *TaskForTests {
 		counter:     new(atomic.Int32),
 	}
 }
-func (this *TaskForTests) Initialize(ctx context.Context) error {
+func (this *TaskForTests) Initialize(_ context.Context) error {
 	defer this.initialized.Add(1)
-	this.log.Printf("initializing: %v", ctx.Value("name"))
+	this.log.Printf("initializing")
 	return this.initErr
 }
 func (this *TaskForTests) identify(id int, ready chan<- bool) {
@@ -46,15 +46,8 @@ func (this *TaskForTests) Listen() {
 	defer this.log.Printf("done listening")
 	defer this.listened.Add(1)
 	this.log.Printf("listening")
-	for {
-		if this.closed.Load() > this.listened.Load() {
-			break
-		}
-		counter := this.counter.Load()
-		if counter == -1 {
-			break
-		}
-		this.log.Printf("listen: %d", counter)
+	for this.closed.Load() <= this.listened.Load() {
+		this.log.Printf("listen: %d", this.counter.Load())
 		time.Sleep(delay() / 5)
 		this.counter.Add(1)
 	}
