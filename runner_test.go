@@ -150,7 +150,7 @@ func (this *Fixture) TestTerminate() {
 	runner := this.NewRunner()
 	go func() {
 		time.Sleep(delay())
-		runner.(*defaultRunner).terminations <- syscall.Signal(0)
+		runner.(*defaultRunner).terminationSignals <- syscall.Signal(0)
 		time.Sleep(delay())
 	}()
 	this.Listen(runner, task)

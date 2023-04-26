@@ -17,7 +17,7 @@ func newRunner(config configuration) Runner {
 }
 
 func (this *defaultRunner) Listen() {
-	this.log.Printf("[INFO] Running configured task [%s] at version [%s]...", this.name, this.version)
+	this.log.Printf("[INFO] Running configured task [%s] at version [%s]...", this.taskName, this.taskVersion)
 	tasks := make(chan func())
 	go this.coordinateTasksWithSignals(tasks)
 	awaitAll(tasks)
@@ -29,10 +29,10 @@ func (this *defaultRunner) coordinateTasksWithSignals(tasks chan func()) {
 		tasks <- this.startNextTask()
 
 		select {
-		case value := <-this.reloads:
+		case value := <-this.reloadSignals:
 			this.log.Printf("[INFO] Received OS reload signal [%v], instructing runner to reload configured task...", value)
 			continue
-		case value := <-this.terminations:
+		case value := <-this.terminationSignals:
 			this.log.Printf("[INFO] Received OS terminate signal [%v], shutting down runner along with any associated task(s)...", value)
 			this.cancel()
 			return
@@ -45,7 +45,7 @@ func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 	this.id++
 	id := this.id
 	ready := make(chan bool, 16)
-	task := this.factory(this.id, ready)
+	task := this.taskFactory(this.id, ready)
 	if task == nil {
 		this.log.Printf("[WARN] No task created for ID [%d].", id)
 		return nil
@@ -84,7 +84,7 @@ func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 func (this *defaultRunner) Reload() {
 	select {
 	case <-this.context.Done(): // already shut down
-	case this.reloads <- syscall.Signal(0):
+	case this.reloadSignals <- syscall.Signal(0):
 	default: // reloads chan may be full
 	}
 }
@@ -92,7 +92,7 @@ func (this *defaultRunner) Reload() {
 func (this *defaultRunner) Close() error {
 	this.log.Printf("[INFO] Request to close runner received, shutting down runner along with any associated task(s)...")
 	this.cancel()
-	signal.Stop(this.terminations)
-	signal.Stop(this.reloads)
+	signal.Stop(this.terminationSignals)
+	signal.Stop(this.reloadSignals)
 	return nil
 }

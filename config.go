@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func New(options ...option) Runner {
@@ -19,24 +20,24 @@ func (singleton) Context(value context.Context) option {
 }
 func (singleton) WatchTerminateSignals(values ...os.Signal) option {
 	return func(this *configuration) {
-		this.terminations = make(chan os.Signal, 16)
-		signal.Notify(this.terminations, values...)
+		this.terminationSignals = make(chan os.Signal, 16)
+		signal.Notify(this.terminationSignals, values...)
 	}
 }
 func (singleton) WatchReloadSignals(values ...os.Signal) option {
 	return func(this *configuration) {
-		this.reloads = make(chan os.Signal, 16)
-		signal.Notify(this.reloads, values...)
+		this.reloadSignals = make(chan os.Signal, 16)
+		signal.Notify(this.reloadSignals, values...)
 	}
 }
 func (singleton) TaskName(value string) option {
-	return func(this *configuration) { this.name = value }
+	return func(this *configuration) { this.taskName = value }
 }
 func (singleton) TaskVersion(value string) option {
-	return func(this *configuration) { this.version = value }
+	return func(this *configuration) { this.taskVersion = value }
 }
 func (singleton) TaskFactory(value TaskFactory) option {
-	return func(this *configuration) { this.factory = value }
+	return func(this *configuration) { this.taskFactory = value }
 }
 func (singleton) Logger(value Logger) option {
 	return func(this *configuration) { this.log = value }
@@ -64,14 +65,14 @@ func (singleton) defaults(options ...option) []option {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type configuration struct {
-	context      context.Context
-	cancel       context.CancelFunc
-	reloads      chan os.Signal
-	terminations chan os.Signal
-	name         string
-	version      string
-	factory      TaskFactory
-	log          Logger
+	log                Logger
+	context            context.Context
+	cancel             context.CancelFunc
+	reloadSignals      chan os.Signal
+	terminationSignals chan os.Signal
+	taskName           string
+	taskVersion        string
+	taskFactory        TaskFactory
 }
 
 type option func(*configuration)
