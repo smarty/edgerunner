@@ -13,10 +13,7 @@ import (
 )
 
 func TestFixture(t *testing.T) {
-	gunit.Run(new(Fixture), t,
-		gunit.Options.LongRunning(),
-		gunit.Options.AllSequential(),
-	)
+	gunit.Run(new(Fixture), t, gunit.Options.AllSequential())
 }
 
 type Fixture struct {
