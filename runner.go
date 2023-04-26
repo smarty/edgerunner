@@ -3,7 +3,6 @@ package edgerunner
 import (
 	"io"
 	"os/signal"
-	"sync"
 	"sync/atomic"
 	"syscall"
 )
@@ -15,37 +14,33 @@ type defaultRunner struct {
 }
 
 func newRunner(config configuration) Runner {
-	runner := &defaultRunner{id: new(atomic.Int32)}
-	runner.configuration = config
-	return runner
+	return &defaultRunner{configuration: config, id: new(atomic.Int32)}
 }
 
 func (this *defaultRunner) Listen() {
 	this.log.Printf("[INFO] Running configured task [%s] at version [%s]...", this.name, this.version)
-	awaitAll(this.goCoordinateTaskWithSignals())
+	tasks := make(chan func())
+	go this.coordinateTasksWithSignals(tasks)
+	awaitAll(tasks)
 	this.log.Printf("[INFO] The configured runner has completed execution of all specified tasks.")
 }
-func (this *defaultRunner) goCoordinateTaskWithSignals() chan func() {
-	tasks := make(chan func())
-	go func() {
-		defer close(tasks)
-		for {
-			tasks <- this.startNextTask()
+func (this *defaultRunner) coordinateTasksWithSignals(tasks chan func()) {
+	defer close(tasks)
+	for {
+		tasks <- this.startNextTask()
 
-			select {
-			case value := <-this.reloads:
-				this.log.Printf("[INFO] Received OS reload signal [%v], instructing runner to reload configured task...", value)
-				continue
-			case value := <-this.terminations:
-				this.log.Printf("[INFO] Received OS terminate signal [%v], shutting down runner along with any associated task(s)...", value)
-				this.cancel()
-				return
-			case <-this.context.Done():
-				return
-			}
+		select {
+		case value := <-this.reloads:
+			this.log.Printf("[INFO] Received OS reload signal [%v], instructing runner to reload configured task...", value)
+			continue
+		case value := <-this.terminations:
+			this.log.Printf("[INFO] Received OS terminate signal [%v], shutting down runner along with any associated task(s)...", value)
+			this.cancel()
+			return
+		case <-this.context.Done():
+			return
 		}
-	}()
-	return tasks
+	}
 }
 func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 	id := int(this.id.Add(1))
@@ -100,33 +95,4 @@ func (this *defaultRunner) Close() error {
 	signal.Stop(this.terminations)
 	signal.Stop(this.reloads)
 	return nil
-}
-
-func load(items ...func()) chan func() {
-	output := make(chan func())
-	go func() {
-		defer close(output)
-		for _, item := range items {
-			output <- item
-		}
-	}()
-	return output
-}
-func awaitAll(actions chan func()) {
-	waiter := prepareWaiter(actions)
-	waiter()
-}
-func prepareWaiter(actions chan func()) (wait func()) {
-	var waiter sync.WaitGroup
-	for action := range actions {
-		if action != nil {
-			waiter.Add(1)
-			go do(action, waiter.Done)
-		}
-	}
-	return waiter.Wait
-}
-func do(action, done func()) {
-	defer done()
-	action()
 }
