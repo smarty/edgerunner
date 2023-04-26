@@ -30,7 +30,7 @@ func (this *defaultRunner) goCoordinateTaskWithSignals() chan func() {
 	go func() {
 		defer close(tasks)
 		for {
-			tasks <- this.startNextTask(this.task)
+			tasks <- this.startNextTask()
 
 			select {
 			case value := <-this.reloads:
@@ -47,27 +47,28 @@ func (this *defaultRunner) goCoordinateTaskWithSignals() chan func() {
 	}()
 	return tasks
 }
-func (this *defaultRunner) startNextTask(older Task) (task func()) {
+func (this *defaultRunner) startNextTask() (task func()) {
 	id := int(this.id.Add(1))
 	ready := make(chan bool, 16)
-	next := this.factory(id, ready)
-	if next == nil {
+	newer := this.factory(id, ready)
+	if newer == nil {
 		this.log.Printf("[WARN] No task created for ID [%d].", id)
 		return nil
 	}
 
-	err := next.Initialize(this.context)
+	err := newer.Initialize(this.context)
 	if err != nil {
 		this.log.Printf("[WARN] Unable to initialize task [%d]: %s", id, err)
-		closeResource(next)
+		closeResource(newer)
 		return nil
 	}
 
-	this.task = next
+	older := this.task
+	this.task = newer
 
 	return prepareWaiter(load(
-		func() { next.Listen() },
-		func() { defer closeResource(next); <-this.context.Done() },
+		func() { newer.Listen() },
+		func() { defer closeResource(newer); <-this.context.Done() },
 		func() {
 			select {
 			case <-this.context.Done():
@@ -77,7 +78,7 @@ func (this *defaultRunner) startNextTask(older Task) (task func()) {
 					closeResource(older)
 				} else {
 					this.log.Printf("[WARN] Pending task [%d] did not arrive at a ready state; continuing with previous task, if any.", id)
-					closeResource(next)
+					closeResource(newer)
 				}
 			}
 		},
