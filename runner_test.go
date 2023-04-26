@@ -26,7 +26,7 @@ type Fixture struct {
 }
 
 func delay() time.Duration {
-	return time.Millisecond * 500
+	return time.Millisecond * 100
 }
 func delayedClose(d time.Duration, closer io.Closer) {
 	time.Sleep(d)

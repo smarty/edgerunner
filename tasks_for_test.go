@@ -55,7 +55,7 @@ func (this *TaskForTests) Listen() {
 			break
 		}
 		this.log.Printf("listen: %d", counter)
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(delay() / 5)
 		this.counter.Add(1)
 	}
 }
