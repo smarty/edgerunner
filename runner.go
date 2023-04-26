@@ -3,18 +3,17 @@ package edgerunner
 import (
 	"io"
 	"os/signal"
-	"sync/atomic"
 	"syscall"
 )
 
 type defaultRunner struct {
 	configuration
-	id   *atomic.Int32
+	id   int
 	task io.Closer
 }
 
 func newRunner(config configuration) Runner {
-	return &defaultRunner{configuration: config, id: new(atomic.Int32)}
+	return &defaultRunner{configuration: config}
 }
 
 func (this *defaultRunner) Listen() {
@@ -43,9 +42,10 @@ func (this *defaultRunner) coordinateTasksWithSignals(tasks chan func()) {
 	}
 }
 func (this *defaultRunner) startNextTask() (taskWaiter func()) {
-	id := int(this.id.Add(1))
+	this.id++
+	id := this.id
 	ready := make(chan bool, 16)
-	task := this.factory(id, ready)
+	task := this.factory(this.id, ready)
 	if task == nil {
 		this.log.Printf("[WARN] No task created for ID [%d].", id)
 		return nil
