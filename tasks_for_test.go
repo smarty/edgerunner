@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type TestingTask struct {
+type TaskForTests struct {
 	log Logger
 
 	readiness *bool
@@ -22,8 +22,8 @@ type TestingTask struct {
 	id int
 }
 
-func NewTestingTask(logger Logger) *TestingTask {
-	return &TestingTask{
+func NewTaskForTests(logger Logger) *TaskForTests {
+	return &TaskForTests{
 		log:         logger,
 		initialized: new(atomic.Int32),
 		listened:    new(atomic.Int32),
@@ -31,18 +31,18 @@ func NewTestingTask(logger Logger) *TestingTask {
 		counter:     new(atomic.Int32),
 	}
 }
-func (this *TestingTask) Initialize(ctx context.Context) error {
+func (this *TaskForTests) Initialize(ctx context.Context) error {
 	defer this.initialized.Add(1)
 	this.log.Printf("initializing: %v", ctx.Value("name"))
 	return this.initErr
 }
-func (this *TestingTask) identify(id int, ready chan<- bool) {
+func (this *TaskForTests) identify(id int, ready chan<- bool) {
 	this.id = id
 	if this.readiness != nil {
 		ready <- *this.readiness
 	}
 }
-func (this *TestingTask) Listen() {
+func (this *TaskForTests) Listen() {
 	defer this.log.Printf("done listening")
 	defer this.listened.Add(1)
 	this.log.Printf("listening")
@@ -59,12 +59,17 @@ func (this *TestingTask) Listen() {
 		this.counter.Add(1)
 	}
 }
-func (this *TestingTask) Close() error {
+func (this *TaskForTests) Close() error {
 	defer this.closed.Add(1)
 	this.log.Printf("closing")
 	return this.closeErr
 }
-func (this *TestingTask) String() string {
+func (this *TaskForTests) String() string {
 	return fmt.Sprintf("task %d; initialized: %d; counter %d; listened: %d; closed %d",
 		this.id, this.initialized.Load(), this.counter.Load(), this.listened.Load(), this.closed.Load())
 }
+
+var (
+	prepared   = func() *bool { a := true; return &a }
+	unprepared = func() *bool { a := false; return &a }
+)
