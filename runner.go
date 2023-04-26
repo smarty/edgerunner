@@ -11,7 +11,7 @@ import (
 type defaultRunner struct {
 	configuration
 	id   *atomic.Int32
-	task Task
+	task io.Closer
 }
 
 func newRunner(config configuration) Runner {
@@ -47,27 +47,28 @@ func (this *defaultRunner) goCoordinateTaskWithSignals() chan func() {
 	}()
 	return tasks
 }
-func (this *defaultRunner) startNextTask() (task func()) {
+func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 	id := int(this.id.Add(1))
 	ready := make(chan bool, 16)
-	newer := this.factory(id, ready)
-	if newer == nil {
+	task := this.factory(id, ready)
+	if task == nil {
 		this.log.Printf("[WARN] No task created for ID [%d].", id)
 		return nil
 	}
 
-	err := newer.Initialize(this.context)
+	err := task.Initialize(this.context)
 	if err != nil {
 		this.log.Printf("[WARN] Unable to initialize task [%d]: %s", id, err)
-		closeResource(newer)
+		closeResource(task)
 		return nil
 	}
 
 	older := this.task
+	newer := newClosedOnce(task)
 	this.task = newer
 
 	return prepareWaiter(load(
-		func() { newer.Listen() },
+		func() { task.Listen() },
 		func() { defer closeResource(newer); <-this.context.Done() },
 		func() {
 			select {
@@ -99,11 +100,6 @@ func (this *defaultRunner) Close() error {
 	signal.Stop(this.terminations)
 	signal.Stop(this.reloads)
 	return nil
-}
-func closeResource(resource io.Closer) {
-	if resource != nil {
-		_ = resource.Close()
-	}
 }
 
 func load(items ...func()) chan func() {

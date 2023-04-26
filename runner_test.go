@@ -147,7 +147,7 @@ func (this *Fixture) TestSubsequentTaskFailsReadinessCheck_ClosedImmediately_Pre
 
 	this.So(task2.initialized.Load(), should.Equal, 1)
 	this.So(task2.listened.Load(), should.Equal, 1)
-	this.So(task2.closed.Load(), should.Equal, 2)
+	this.So(task2.closed.Load(), should.Equal, 1)
 }
 func (this *Fixture) TestTerminate() {
 	task := NewTestingTask(NewTestLogger(this.T(), "TASK"))
