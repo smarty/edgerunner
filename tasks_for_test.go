@@ -36,10 +36,12 @@ func (this *TaskForTests) Initialize(_ context.Context) error {
 	this.log.Printf("initializing")
 	return this.initErr
 }
-func (this *TaskForTests) identify(id int, ready chan<- bool) {
+func (this *TaskForTests) identify(id int, ready func(bool)) {
 	this.id = id
 	if this.readiness != nil {
-		ready <- *this.readiness
+		ready(*this.readiness)
+		ready(false) // ensure runner ignores (and doesn't choke on) repeated calls
+		ready(true)  // ensure runner doesn't (and doesn't choke on) repeated calls
 	}
 }
 func (this *TaskForTests) Listen() {

@@ -32,7 +32,7 @@ func delayedClose(d time.Duration, closer io.Closer) {
 	time.Sleep(d)
 	_ = closer.Close()
 }
-func (this *Fixture) taskFactory(id int, ready chan<- bool) Task {
+func (this *Fixture) taskFactory(id int, ready func(bool)) Task {
 	if id > len(this.tasks) {
 		return nil
 	}
