@@ -56,7 +56,7 @@ func (this *Fixture) Setup() {
 	this.ctx = context.WithValue(context.Background(), "name", this.Name())
 }
 func (this *Fixture) TestTask_InitializationError() {
-	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"))
+	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"), omitReadiness())
 	task.initErr = errors.New("BOINK")
 
 	runner := this.NewRunner()
@@ -70,7 +70,7 @@ func (this *Fixture) TestTask_InitializationError() {
 	this.So(task.closed.Load(), should.Equal, 1)
 }
 func (this *Fixture) TestTask_Initialized_Listened_Closed() {
-	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"))
+	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"), prepared())
 
 	runner := this.NewRunner()
 	go delayedClose(delay(), runner)
@@ -82,9 +82,8 @@ func (this *Fixture) TestTask_Initialized_Listened_Closed() {
 	this.So(task.closed.Load(), should.Equal, 1)
 }
 func (this *Fixture) TestReload() {
-	task1 := NewTaskForTests(NewTestLogger(this.T(), "TASK-1"))
-	task2 := NewTaskForTests(NewTestLogger(this.T(), "TASK-2"))
-	task1.readiness = prepared()
+	task1 := NewTaskForTests(NewTestLogger(this.T(), "TASK-1"), prepared())
+	task2 := NewTaskForTests(NewTestLogger(this.T(), "TASK-2"), omitReadiness())
 
 	runner := this.NewRunner()
 
@@ -105,10 +104,9 @@ func (this *Fixture) TestReload() {
 	this.So(task2.listened.Load(), should.Equal, 1)
 	this.So(task2.closed.Load(), should.Equal, 1)
 }
-
 func (this *Fixture) TestSubsequentTaskFailsReadinessCheck_ClosedImmediately_PreviousTaskContinues() {
-	task1 := NewTaskForTests(NewTestLogger(this.T(), "TASK-1"))
-	task2 := NewTaskForTests(NewTestLogger(this.T(), "TASK-2"))
+	task1 := NewTaskForTests(NewTestLogger(this.T(), "TASK-1"), prepared())
+	task2 := NewTaskForTests(NewTestLogger(this.T(), "TASK-2"), unprepared())
 	task1.readiness = prepared()
 	task2.readiness = unprepared()
 
@@ -137,7 +135,7 @@ func (this *Fixture) TestSubsequentTaskFailsReadinessCheck_ClosedImmediately_Pre
 	this.So(task2.closed.Load(), should.Equal, 1)
 }
 func (this *Fixture) TestTerminate() {
-	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"))
+	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"), prepared())
 
 	runner := this.NewRunner()
 	go func() {
@@ -153,9 +151,8 @@ func (this *Fixture) TestTerminate() {
 	this.So(task.closed.Load(), should.Equal, 1)
 }
 func (this *Fixture) TestReadinessTimeoutReached_TaskAborted() {
-	task1 := NewTaskForTests(NewTestLogger(this.T(), "TASK-1"))
-	task2 := NewTaskForTests(NewTestLogger(this.T(), "TASK-2"))
-	task1.readiness = prepared()
+	task1 := NewTaskForTests(NewTestLogger(this.T(), "TASK-1"), prepared())
+	task2 := NewTaskForTests(NewTestLogger(this.T(), "TASK-2"), omitReadiness())
 
 	runner := this.NewRunner(Options.ReadinessTimeout(delay() / 2))
 	wait := prepareWaiter(load(func() {

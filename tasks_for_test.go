@@ -2,7 +2,6 @@ package edgerunner
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 	"time"
 )
@@ -10,21 +9,20 @@ import (
 type TaskForTests struct {
 	log Logger
 
+	id        int
 	readiness *bool
 	initErr   error
-	closeErr  error
 
 	initialized *atomic.Int32
 	listened    *atomic.Int32
 	closed      *atomic.Int32
 	counter     *atomic.Int32
-
-	id int
 }
 
-func NewTaskForTests(logger Logger) *TaskForTests {
+func NewTaskForTests(logger Logger, readiness *bool) *TaskForTests {
 	return &TaskForTests{
 		log:         logger,
+		readiness:   readiness,
 		initialized: new(atomic.Int32),
 		listened:    new(atomic.Int32),
 		closed:      new(atomic.Int32),
@@ -55,14 +53,11 @@ func (this *TaskForTests) Listen() {
 func (this *TaskForTests) Close() error {
 	defer this.closed.Add(1)
 	this.log.Printf("closing")
-	return this.closeErr
-}
-func (this *TaskForTests) String() string {
-	return fmt.Sprintf("task %d; initialized: %d; counter %d; listened: %d; closed %d",
-		this.id, this.initialized.Load(), this.counter.Load(), this.listened.Load(), this.closed.Load())
+	return nil
 }
 
 var (
-	prepared   = func() *bool { a := true; return &a }
-	unprepared = func() *bool { a := false; return &a }
+	prepared      = func() *bool { a := true; return &a }
+	unprepared    = func() *bool { a := false; return &a }
+	omitReadiness = func() *bool { return nil }
 )
