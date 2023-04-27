@@ -45,9 +45,8 @@ func (this *TaskForTests) Listen() {
 	defer this.listened.Add(1)
 	this.log.Printf("listening")
 	for this.closed.Load() <= this.listened.Load() {
-		this.log.Printf("listen: %d", this.counter.Load())
+		this.log.Printf("listen: %d", this.counter.Add(1))
 		time.Sleep(delay() / 5)
-		this.counter.Add(1)
 	}
 }
 func (this *TaskForTests) Close() error {
