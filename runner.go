@@ -47,7 +47,7 @@ func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 	this.id++
 	id := this.id
 	readiness := make(chan bool, 1)
-	once := new(sync.Once)
+	var once sync.Once
 	ready := func(b bool) { once.Do(func() { defer close(readiness); readiness <- b }) }
 	task := this.taskFactory(this.id, ready)
 	if task == nil {
