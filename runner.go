@@ -48,7 +48,7 @@ func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 	id := this.id
 	readiness := make(chan bool, 1)
 	var once sync.Once
-	ready := func(b bool) { once.Do(func() { defer close(readiness); readiness <- b }) }
+	ready := func(state bool) { once.Do(func() { defer close(readiness); readiness <- state }) }
 	task := this.taskFactory(this.id, ready)
 	if task == nil {
 		this.log.Printf("[WARN] No task created for ID [%d].", id)
