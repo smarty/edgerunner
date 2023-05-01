@@ -55,6 +55,9 @@ func (this *Fixture) Listen(runner Runner, tasks ...*TaskForTests) {
 func (this *Fixture) Setup() {
 	this.ctx = context.WithValue(context.Background(), "name", this.Name())
 }
+func (this *Fixture) TestTask_NoTaskFactory_Panic() {
+	this.So(func() { New() }, should.Panic)
+}
 func (this *Fixture) TestTask_InitializationError() {
 	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"), omitReadiness())
 	task.initErr = errors.New("BOINK")

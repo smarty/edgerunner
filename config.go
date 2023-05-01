@@ -12,6 +12,9 @@ import (
 func New(options ...option) Runner {
 	var config configuration
 	Options.apply(options...)(&config)
+	if config.taskFactory == nil {
+		panic("no task factory provided")
+	}
 	return newRunner(config)
 }
 
@@ -60,7 +63,6 @@ func (singleton) defaults(options ...option) []option {
 		Options.WatchReloadSignals(syscall.SIGHUP),
 		Options.TaskName("unknown"),
 		Options.TaskVersion("unknown"),
-		Options.TaskFactory(func(id int, ready chan<- bool) Task { return nil }),
 		Options.Logger(log.Default()),
 		Options.ReadinessTimeout(time.Hour),
 	}, options...)
