@@ -58,6 +58,12 @@ func (this *Fixture) Setup() {
 func (this *Fixture) TestTask_NoTaskFactory_Panic() {
 	this.So(func() { New() }, should.Panic)
 }
+func (this *Fixture) TestTaskFactoryReturnsNilTask() {
+	runner := this.NewRunner(Options.TaskFactory(func(id int, ready chan<- bool) Task { return nil }))
+	go delayedClose(delay(), runner)
+	this.Listen(runner)
+	this.So(runner.(*defaultRunner).id, should.Equal, 0)
+}
 func (this *Fixture) TestTask_InitializationError() {
 	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"), omitReadiness())
 	task.initErr = errors.New("BOINK")

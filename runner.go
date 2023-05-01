@@ -43,15 +43,15 @@ func (this *defaultRunner) coordinateTasksWithSignals(tasks chan func()) {
 	}
 }
 func (this *defaultRunner) startNextTask() (taskWaiter func()) {
-	this.id++
-	id := this.id
+	id := this.id + 1
 	ready := make(chan bool, 16)
-	task := this.taskFactory(this.id, ready)
+	task := this.taskFactory(id, ready)
 	if task == nil {
 		this.log.Printf("[WARN] No task created for ID [%d].", id)
 		return nil
 	}
 
+	this.id++
 	ctx, release := context.WithTimeout(this.context, this.readinessTimeout)
 	err := task.Initialize(this.context)
 	if err != nil {
