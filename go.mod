@@ -1,4 +1,4 @@
-module github.com/smarty/edgerunner
+module github.com/smarty/edgerunner/v2
 
 go 1.18
 
