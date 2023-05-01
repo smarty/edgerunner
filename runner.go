@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
@@ -44,14 +45,15 @@ func (this *defaultRunner) coordinateTasksWithSignals(tasks chan func()) {
 }
 func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 	id := this.id + 1
-	ready := make(chan bool, 16)
+	readiness := make(chan bool, 1)
+	var once sync.Once
+	ready := func(state bool) { once.Do(func() { defer close(readiness); readiness <- state }) }
 	task := this.taskFactory(id, ready)
 	if task == nil {
 		this.log.Printf("[WARN] No task created for ID [%d].", id)
 		return nil
 	}
 
-	this.id++
 	ctx, release := context.WithTimeout(this.context, this.readinessTimeout)
 	err := task.Initialize(this.context)
 	if err != nil {
@@ -63,6 +65,7 @@ func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 
 	older := this.task
 	newer := newClosedOnce(task)
+	this.id = id
 	this.task = newer
 
 	return prepareWaiter(load(
@@ -73,7 +76,7 @@ func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 			case <-ctx.Done():
 				this.log.Printf("[INFO] Pending task [%d] failed to report readiness before configured timeout of [%s]; continuing with previous task, if any.", id, this.readinessTimeout)
 				closeResource(newer)
-			case newerIsReady := <-ready:
+			case newerIsReady := <-readiness:
 				if newerIsReady {
 					this.log.Printf("[INFO] Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", id)
 					closeResource(older)

@@ -43,10 +43,9 @@ type (
 		ListenCloser
 	}
 	// TaskFactory is a callback for building whatever task will be managed
-	// by the Runner. The supplied task should send a single true/false on
-	// the provided ready chan indicating its readiness to begin working.
-	// The Runner will only respond to the first value sent.
-	TaskFactory func(id int, ready chan<- bool) Task
+	// by the Runner. The supplied task should call the ready func to indicate
+	// its readiness to begin working. Only the first call has any effect.
+	TaskFactory func(id int, ready func(bool)) Task
 )
 
 type Logger interface {

@@ -29,7 +29,7 @@ func delayedClose(d time.Duration, closer io.Closer) {
 	time.Sleep(d)
 	_ = closer.Close()
 }
-func (this *Fixture) taskFactory(id int, ready chan<- bool) Task {
+func (this *Fixture) taskFactory(id int, ready func(bool)) Task {
 	if id > len(this.tasks) {
 		return nil
 	}
@@ -59,7 +59,7 @@ func (this *Fixture) TestTask_NoTaskFactory_Panic() {
 	this.So(func() { New() }, should.Panic)
 }
 func (this *Fixture) TestTaskFactoryReturnsNilTask() {
-	runner := this.NewRunner(Options.TaskFactory(func(id int, ready chan<- bool) Task { return nil }))
+	runner := this.NewRunner(Options.TaskFactory(func(id int, ready func(bool)) Task { return nil }))
 	go delayedClose(delay(), runner)
 	this.Listen(runner)
 	this.So(runner.(*defaultRunner).id, should.Equal, 0)
