@@ -43,7 +43,7 @@ func (singleton) TaskFactory(value TaskFactory) option {
 	return func(this *configuration) { this.taskFactory = value }
 }
 func (singleton) Logger(value Logger) option {
-	return func(this *configuration) { this.log = value }
+	return func(this *configuration) { this.logger = value }
 }
 func (singleton) ReadinessTimeout(value time.Duration) option {
 	return func(this *configuration) { this.readinessTimeout = value }
@@ -71,7 +71,7 @@ func (singleton) defaults(options ...option) []option {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type configuration struct {
-	log                Logger
+	logger             Logger
 	context            context.Context
 	cancel             context.CancelFunc
 	reloadSignals      chan os.Signal
