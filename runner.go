@@ -74,7 +74,7 @@ func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 		func() {
 			select {
 			case <-ctx.Done():
-				this.info("Pending task [%d] failed to report readiness before configured timeout of [%s]; "+
+				this.warn("Pending task [%d] failed to report readiness before configured timeout of [%s]; "+
 					"continuing with previous task, if any.", id, this.readinessTimeout)
 				closeResource(newer)
 			case newerIsReady := <-readiness:
