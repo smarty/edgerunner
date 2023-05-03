@@ -33,7 +33,7 @@ func (this *Fixture) taskFactory(id int, ready func(bool)) Task {
 	if id > len(this.tasks) {
 		return nil
 	}
-	task := this.tasks[id-1]
+	task := this.tasks[id]
 	task.identify(id, ready)
 	return task
 }
@@ -73,7 +73,7 @@ func (this *Fixture) TestTask_InitializationError() {
 	this.Listen(runner, task)
 
 	time.Sleep(delay())
-	this.So(task.id, should.Equal, 1)
+	this.So(task.id, should.Equal, 0)
 	this.So(task.initialized.Load(), should.Equal, 1)
 	this.So(task.listened.Load(), should.Equal, 0)
 	this.So(task.closed.Load(), should.Equal, 1)
@@ -85,7 +85,7 @@ func (this *Fixture) TestTask_Initialized_Listened_Closed() {
 	go delayedClose(delay(), runner)
 	this.Listen(runner, task)
 
-	this.So(task.id, should.Equal, 1)
+	this.So(task.id, should.Equal, 0)
 	this.So(task.initialized.Load(), should.Equal, 1)
 	this.So(task.listened.Load(), should.Equal, 1)
 	this.So(task.closed.Load(), should.Equal, 1)
@@ -103,12 +103,12 @@ func (this *Fixture) TestReload() {
 	}()
 	this.Listen(runner, task1, task2)
 
-	this.So(task1.id, should.Equal, 1)
+	this.So(task1.id, should.Equal, 0)
 	this.So(task1.initialized.Load(), should.Equal, 1)
 	this.So(task1.listened.Load(), should.Equal, 1)
 	this.So(task1.closed.Load(), should.Equal, 1)
 
-	this.So(task2.id, should.Equal, 2)
+	this.So(task2.id, should.Equal, 1)
 	this.So(task2.initialized.Load(), should.Equal, 1)
 	this.So(task2.listened.Load(), should.Equal, 1)
 	this.So(task2.closed.Load(), should.Equal, 1)
@@ -154,7 +154,7 @@ func (this *Fixture) TestTerminate() {
 	}()
 	this.Listen(runner, task)
 
-	this.So(task.id, should.Equal, 1)
+	this.So(task.id, should.Equal, 0)
 	this.So(task.initialized.Load(), should.Equal, 1)
 	this.So(task.listened.Load(), should.Equal, 1)
 	this.So(task.closed.Load(), should.Equal, 1)

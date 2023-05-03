@@ -44,7 +44,7 @@ func (this *defaultRunner) coordinateTasksWithSignals(tasks chan func()) {
 	}
 }
 func (this *defaultRunner) startNextTask() (taskWaiter func()) {
-	id := this.id + 1
+	id := this.id // prevent data races by NOT passing this.id to goroutine functions below
 	readiness := make(chan bool, 1)
 	var once sync.Once
 	ready := func(state bool) { once.Do(func() { defer close(readiness); readiness <- state }) }
@@ -64,8 +64,8 @@ func (this *defaultRunner) startNextTask() (taskWaiter func()) {
 	}
 
 	older := this.task
-	newer := newClosedOnce(task)
-	this.id = id
+	newer := newClosedOnce(task) // prevent data races by NOT passing this.task to goroutine functions below
+	this.id++
 	this.task = newer
 
 	return prepareWaiter(load(
