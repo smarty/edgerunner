@@ -28,7 +28,7 @@ func (this *defaultRunner) Listen() {
 func (this *defaultRunner) coordinateTasksWithSignals(tasks chan func()) {
 	defer close(tasks)
 	for {
-		tasks <- this.startNextTask()
+		tasks <- this.initializeNextTask()
 
 		select {
 		case value := <-this.reloadSignals:
@@ -43,7 +43,7 @@ func (this *defaultRunner) coordinateTasksWithSignals(tasks chan func()) {
 		}
 	}
 }
-func (this *defaultRunner) startNextTask() (taskWaiter func()) {
+func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 	id := this.id // prevent data races by NOT passing this.id to goroutine functions below
 	readiness := make(chan bool, 1)
 	var once sync.Once

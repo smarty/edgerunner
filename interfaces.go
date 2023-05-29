@@ -38,7 +38,9 @@ type (
 	Task interface {
 		// Initialize provides an opportunity for the task to load its
 		// configuration, incorporating the supplied context.Context for
-		// operations that support it.
+		// operations that support it. This step should only prepare to
+		// perform the work but should not perform any significant work
+		// which might block termination signals from being handled.
 		Initialize(ctx context.Context) error
 		ListenCloser
 	}
