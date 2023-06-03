@@ -79,7 +79,12 @@ func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 				closeResource(newer)
 			case newerIsReady := <-readiness:
 				if newerIsReady {
-					this.info("Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", id)
+					if id == 0 {
+						this.info("Pending task [%d] has arrived at a ready state.", id)
+					} else {
+						this.info("Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", id)
+					}
+
 					closeResource(older)
 				} else {
 					this.warn("Pending task [%d] did not arrive at a ready state; continuing with previous task, if any.", id)
