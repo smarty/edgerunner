@@ -18,8 +18,9 @@ func TestFixture(t *testing.T) {
 
 type Fixture struct {
 	*gunit.Fixture
-	ctx   context.Context
-	tasks []*TaskForTests
+	ctx       context.Context
+	tasks     []*TaskForTests
+	runnerLog *TestLogger
 }
 
 func delay() time.Duration {
@@ -43,7 +44,7 @@ func (this *Fixture) NewRunner(options ...option) Runner {
 		Options.TaskVersion("0"),
 		Options.TaskName(this.Name()),
 		Options.TaskFactory(this.taskFactory),
-		Options.Logger(NewTestLogger(this.T(), "EDGE")),
+		Options.Logger(this.runnerLog),
 		Options.WatchReloadSignals(syscall.SIGUSR1),
 		Options.WatchTerminateSignals(syscall.SIGUSR2),
 	}, options...)...)
@@ -54,6 +55,7 @@ func (this *Fixture) Listen(runner Runner, tasks ...*TaskForTests) {
 }
 func (this *Fixture) Setup() {
 	this.ctx = context.WithValue(context.Background(), "name", this.Name())
+	this.runnerLog = NewTestLogger(this.T(), "EDGE")
 }
 func (this *Fixture) TestTask_NoTaskFactory_Panic() {
 	this.So(func() { New() }, should.Panic)
@@ -89,10 +91,12 @@ func (this *Fixture) TestTask_Initialized_Listened_Closed() {
 	this.So(task.initialized.Load(), should.Equal, 1)
 	this.So(task.listened.Load(), should.Equal, 1)
 	this.So(task.closed.Load(), should.Equal, 1)
+	this.So(this.runnerLog.history, should.ContainSubstring, "|[INFO] Pending task [0] has arrived at a ready state.|\n")
+	this.So(this.runnerLog.history, should.NotContainSubstring, "|[INFO] Shutting down previous task.|\n")
 }
 func (this *Fixture) TestReload() {
 	task1 := NewTaskForTests(NewTestLogger(this.T(), "TASK-1"), prepared())
-	task2 := NewTaskForTests(NewTestLogger(this.T(), "TASK-2"), omitReadiness())
+	task2 := NewTaskForTests(NewTestLogger(this.T(), "TASK-2"), prepared())
 
 	runner := this.NewRunner()
 
@@ -107,11 +111,14 @@ func (this *Fixture) TestReload() {
 	this.So(task1.initialized.Load(), should.Equal, 1)
 	this.So(task1.listened.Load(), should.Equal, 1)
 	this.So(task1.closed.Load(), should.Equal, 1)
+	this.So(this.runnerLog.history, should.ContainSubstring, "|[INFO] Pending task [0] has arrived at a ready state.|\n")
 
 	this.So(task2.id, should.Equal, 1)
 	this.So(task2.initialized.Load(), should.Equal, 1)
 	this.So(task2.listened.Load(), should.Equal, 1)
 	this.So(task2.closed.Load(), should.Equal, 1)
+	this.So(this.runnerLog.history, should.ContainSubstring, "|[INFO] Pending task [1] has arrived at a ready state.|\n")
+	this.So(this.runnerLog.history, should.ContainSubstring, "|[INFO] Shutting down previous task.|\n")
 }
 func (this *Fixture) TestSubsequentTaskFailsReadinessCheck_ClosedImmediately_PreviousTaskContinues() {
 	task1 := NewTaskForTests(NewTestLogger(this.T(), "TASK-1"), prepared())
@@ -142,6 +149,9 @@ func (this *Fixture) TestSubsequentTaskFailsReadinessCheck_ClosedImmediately_Pre
 	this.So(task2.initialized.Load(), should.Equal, 1)
 	this.So(task2.listened.Load(), should.Equal, 1)
 	this.So(task2.closed.Load(), should.Equal, 1)
+
+	this.So(this.runnerLog.history, should.ContainSubstring, "|[WARN] Pending task [1] did not arrive at a ready state.|\n")
+	this.So(this.runnerLog.history, should.ContainSubstring, "|[INFO] Continuing with previous task.|\n")
 }
 func (this *Fixture) TestTerminate() {
 	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"), prepared())
@@ -184,4 +194,6 @@ func (this *Fixture) TestReadinessTimeoutReached_TaskAborted() {
 	this.So(task2.initialized.Load(), should.Equal, 1)
 	this.So(task2.listened.Load(), should.Equal, 1)
 	this.So(task2.closed.Load(), should.Equal, 1)
+	this.So(this.runnerLog.history, should.ContainSubstring, "|[WARN] Pending task [1] failed to report readiness before configured timeout of [50ms].|\n")
+	this.So(this.runnerLog.history, should.ContainSubstring, "|[INFO] Continuing with previous task.|\n")
 }

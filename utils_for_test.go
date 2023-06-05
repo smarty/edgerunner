@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/smartystreets/gunit"
@@ -11,13 +12,19 @@ import (
 
 type TestLogger struct {
 	gunit.TestingT
-	prefix string
+	lock    *sync.Mutex
+	prefix  string
+	history string
 }
 
 func NewTestLogger(t gunit.TestingT, prefix string) *TestLogger {
-	return &TestLogger{TestingT: t, prefix: prefix}
+	return &TestLogger{TestingT: t, prefix: prefix, lock: &sync.Mutex{}}
 }
 func (this *TestLogger) Printf(format string, args ...any) {
+	this.lock.Lock()
+	this.history += "|" + fmt.Sprintf(format, args...) + "|" + "\n"
+	this.lock.Unlock()
+
 	_, path, line, _ := runtime.Caller(1)
 	file := filepath.Base(path)
 	clock := fmt.Sprintf("%-12s", time.Now().Format("15:04:05.999"))

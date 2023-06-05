@@ -74,20 +74,17 @@ func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 		func() {
 			select {
 			case <-ctx.Done():
-				this.warn("Pending task [%d] failed to report readiness before configured timeout of [%s]; "+
-					"continuing with previous task, if any.", id, this.readinessTimeout)
+				this.warn("Pending task [%d] failed to report readiness before configured timeout of [%s].", id, this.readinessTimeout)
+				this.infoIf(id > 0, "Continuing with previous task.")
 				closeResource(newer)
 			case newerIsReady := <-readiness:
 				if newerIsReady {
-					if id == 0 {
-						this.info("Pending task [%d] has arrived at a ready state.", id)
-					} else {
-						this.info("Pending task [%d] has arrived at a ready state; shutting down previous task, if any.", id)
-					}
-
+					this.info("Pending task [%d] has arrived at a ready state.", id)
+					this.infoIf(id > 0, "Shutting down previous task.")
 					closeResource(older)
 				} else {
-					this.warn("Pending task [%d] did not arrive at a ready state; continuing with previous task, if any.", id)
+					this.warn("Pending task [%d] did not arrive at a ready state.", id)
+					this.infoIf(id > 0, "Continuing with previous task.")
 					closeResource(newer)
 				}
 			}
@@ -111,6 +108,11 @@ func (this *defaultRunner) Close() error {
 	return nil
 }
 
+func (this *defaultRunner) infoIf(condition bool, format string, args ...any) {
+	if condition {
+		this.info(format, args...)
+	}
+}
 func (this *defaultRunner) info(format string, args ...any) { this.log("[INFO] ", format, args...) }
 func (this *defaultRunner) warn(format string, args ...any) { this.log("[WARN] ", format, args...) }
 func (this *defaultRunner) log(prefix, format string, args ...any) {
