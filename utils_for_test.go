@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartystreets/gunit"
+	"github.com/smarty/gunit"
 )
 
 type TestLogger struct {
