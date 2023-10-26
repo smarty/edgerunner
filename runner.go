@@ -6,7 +6,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 )
 
 type defaultRunner struct {
@@ -75,7 +74,7 @@ func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 		func() {
 			select {
 			case <-ctx.Done():
-				if deadline, _ := ctx.Deadline(); deadline.Before(time.Now().UTC()) {
+				if deadline, _ := ctx.Deadline(); deadline.Before(this.now().UTC()) {
 					this.warn("Pending task [%d] failed to report readiness before configured timeout of [%s].", id, this.readinessTimeout)
 				}
 				this.infoIf(id > 0, "Continuing with previous task.")

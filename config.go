@@ -11,6 +11,7 @@ import (
 
 func New(options ...option) Runner {
 	var config configuration
+	config.now = func() time.Time { return time.Now().UTC() }
 	Options.apply(options...)(&config)
 	if config.taskFactory == nil {
 		panic("no task factory provided")
@@ -71,6 +72,7 @@ func (singleton) defaults(options ...option) []option {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type configuration struct {
+	now                func() time.Time
 	logger             Logger
 	context            context.Context
 	cancel             context.CancelFunc
