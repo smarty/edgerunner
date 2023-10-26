@@ -11,7 +11,6 @@ import (
 
 func New(options ...option) Runner {
 	var config configuration
-	config.now = func() time.Time { return time.Now().UTC() }
 	Options.apply(options...)(&config)
 	if config.taskFactory == nil {
 		panic("no task factory provided")
@@ -19,6 +18,9 @@ func New(options ...option) Runner {
 	return newRunner(config)
 }
 
+func (singleton) now(now func() time.Time) option {
+	return func(c *configuration) { c.now = now }
+}
 func (singleton) Context(value context.Context) option {
 	return func(this *configuration) { this.context, this.cancel = context.WithCancel(value) }
 }
@@ -59,6 +61,7 @@ func (singleton) apply(options ...option) option {
 }
 func (singleton) defaults(options ...option) []option {
 	return append([]option{
+		Options.now(func() time.Time { return time.Now().UTC() }),
 		Options.Context(context.Background()),
 		Options.WatchTerminateSignals(syscall.SIGINT, syscall.SIGTERM),
 		Options.WatchReloadSignals(syscall.SIGHUP),
