@@ -169,6 +169,15 @@ func (this *Fixture) TestTerminate() {
 	this.So(task.listened.Load(), should.Equal, 1)
 	this.So(task.closed.Load(), should.Equal, 1)
 }
+func (this *Fixture) TestTerminateBeforeTimeoutAndWithoutReadiness_OmitFailureToReportBeforeTimeout() {
+	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"), omitReadiness())
+
+	runner := this.NewRunner()
+	go func() { runner.(*defaultRunner).terminationSignals <- syscall.Signal(0) }()
+	this.Listen(runner, task)
+
+	this.So(this.runnerLog.history, should.NotContainSubstring, "failed to report readiness before configured timeout")
+}
 func (this *Fixture) TestReadinessTimeoutReached_TaskAborted() {
 	task1 := NewTaskForTests(NewTestLogger(this.T(), "TASK-1"), prepared())
 	task2 := NewTaskForTests(NewTestLogger(this.T(), "TASK-2"), omitReadiness())
