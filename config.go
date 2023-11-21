@@ -2,7 +2,6 @@ package edgerunner
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -45,7 +44,7 @@ func (singleton) TaskVersion(value string) option {
 func (singleton) TaskFactory(value TaskFactory) option {
 	return func(this *configuration) { this.taskFactory = value }
 }
-func (singleton) Logger(value Logger) option {
+func (singleton) Logger(value logger) option {
 	return func(this *configuration) { this.logger = value }
 }
 func (singleton) ReadinessTimeout(value time.Duration) option {
@@ -67,7 +66,7 @@ func (singleton) defaults(options ...option) []option {
 		Options.WatchReloadSignals(syscall.SIGHUP),
 		Options.TaskName("unknown"),
 		Options.TaskVersion("unknown"),
-		Options.Logger(log.Default()),
+		Options.Logger(nop{}),
 		Options.ReadinessTimeout(time.Hour),
 	}, options...)
 }
@@ -76,7 +75,7 @@ func (singleton) defaults(options ...option) []option {
 
 type configuration struct {
 	now                func() time.Time
-	logger             Logger
+	logger             logger
 	context            context.Context
 	cancel             context.CancelFunc
 	reloadSignals      chan os.Signal
@@ -91,3 +90,9 @@ type option func(*configuration)
 type singleton struct{}
 
 var Options singleton
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+type nop struct{}
+
+func (nop) Printf(string, ...any) {}

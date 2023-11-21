@@ -50,6 +50,6 @@ type (
 	TaskFactory func(id int, ready func(bool)) Task
 )
 
-type Logger interface {
+type logger interface {
 	Printf(string, ...any)
 }

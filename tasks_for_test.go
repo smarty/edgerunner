@@ -7,7 +7,7 @@ import (
 )
 
 type TaskForTests struct {
-	log Logger
+	log logger
 
 	id        int
 	readiness *bool
@@ -19,7 +19,7 @@ type TaskForTests struct {
 	counter     *atomic.Int32
 }
 
-func NewTaskForTests(logger Logger, readiness *bool) *TaskForTests {
+func NewTaskForTests(logger logger, readiness *bool) *TaskForTests {
 	return &TaskForTests{
 		log:         logger,
 		readiness:   readiness,
