@@ -39,7 +39,7 @@ func (this *TaskForTests) identify(id int, ready func(bool)) {
 	if this.readiness != nil {
 		ready(*this.readiness)
 		ready(false) // ensure runner ignores (and doesn't choke on) repeated calls
-		ready(true)  // ensure runner doesn't (and doesn't choke on) repeated calls
+		ready(true)  // ensure runner ignores (and doesn't choke on) repeated calls
 	}
 }
 func (this *TaskForTests) Listen() {
