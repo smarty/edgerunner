@@ -21,7 +21,10 @@ func (singleton) now(now func() time.Time) option {
 	return func(c *configuration) { c.now = now }
 }
 func (singleton) Context(value context.Context) option {
-	return func(this *configuration) { this.childContext, this.childCancel = context.WithCancel(value) }
+	return func(this *configuration) {
+		this.parentContext = value
+		this.childContext, this.childCancel = context.WithCancel(value)
+	}
 }
 func (singleton) WatchTerminateSignals(values ...os.Signal) option {
 	return func(this *configuration) {
@@ -76,6 +79,7 @@ func (singleton) defaults(options ...option) []option {
 type configuration struct {
 	now                func() time.Time
 	logger             logger
+	parentContext      context.Context
 	childContext       context.Context
 	childCancel        context.CancelFunc
 	reloadSignals      chan os.Signal

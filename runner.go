@@ -55,7 +55,7 @@ func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 	}
 
 	ctx, release := context.WithTimeout(this.childContext, this.readinessTimeout)
-	err := task.Initialize(this.childContext)
+	err := task.Initialize(this.parentContext)
 	if err != nil {
 		this.warn("Unable to initialize task [%d]: %s", id, err)
 		release()

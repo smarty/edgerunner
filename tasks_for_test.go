@@ -17,6 +17,8 @@ type TaskForTests struct {
 	listened    *atomic.Int32
 	closed      *atomic.Int32
 	counter     *atomic.Int32
+	ctx         context.Context
+	ctxError    error
 }
 
 func NewTaskForTests(logger logger, readiness *bool) *TaskForTests {
@@ -29,9 +31,10 @@ func NewTaskForTests(logger logger, readiness *bool) *TaskForTests {
 		counter:     new(atomic.Int32),
 	}
 }
-func (this *TaskForTests) Initialize(_ context.Context) error {
+func (this *TaskForTests) Initialize(ctx context.Context) error {
 	defer this.initialized.Add(1)
 	this.log.Printf("initializing")
+	this.ctx = ctx
 	return this.initErr
 }
 func (this *TaskForTests) identify(id int, ready func(bool)) {
@@ -52,8 +55,13 @@ func (this *TaskForTests) Listen() {
 	}
 }
 func (this *TaskForTests) Close() error {
+	defer this.log.Printf("done closing")
 	defer this.closed.Add(1)
-	this.log.Printf("closing")
+	this.log.Printf("will close after shutdown delay")
+	child, cancel := context.WithTimeout(this.ctx, time.Millisecond*20)
+	defer cancel()
+	<-child.Done()
+	this.ctxError = child.Err()
 	return nil
 }
 

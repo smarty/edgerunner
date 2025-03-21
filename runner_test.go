@@ -168,6 +168,11 @@ func (this *Fixture) TestTerminate() {
 	this.So(task.initialized.Load(), should.Equal, 1)
 	this.So(task.listened.Load(), should.Equal, 1)
 	this.So(task.closed.Load(), should.Equal, 1)
+
+	// Ensure that edgerunner only cancels the 'child' context (not the 'parent' context, which the
+	// task/app is responsible for canceling). In the errant case of canceling the 'parent', we would see
+	// context.Canceled here. This all facilitates a clean (delayed) shutdown procedure.
+	this.So(task.ctxError, should.Wrap, context.DeadlineExceeded)
 }
 func (this *Fixture) TestTerminateBeforeTimeoutAndWithoutReadiness_OmitFailureToReportBeforeTimeout() {
 	task := NewTaskForTests(NewTestLogger(this.T(), "TASK"), omitReadiness())
