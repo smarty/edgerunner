@@ -36,9 +36,9 @@ func (this *defaultRunner) coordinateTasksWithSignals(tasks chan func()) {
 			continue
 		case value := <-this.terminationSignals:
 			this.info("Received OS terminate signal [%v], shutting down runner along with any associated task(s)...", value)
-			this.cancel()
+			this.childCancel()
 			return
-		case <-this.context.Done():
+		case <-this.childContext.Done():
 			return
 		}
 	}
@@ -54,8 +54,8 @@ func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 		return nil
 	}
 
-	ctx, release := context.WithTimeout(this.context, this.readinessTimeout)
-	err := task.Initialize(this.context)
+	ctx, release := context.WithTimeout(this.childContext, this.readinessTimeout)
+	err := task.Initialize(this.childContext)
 	if err != nil {
 		this.warn("Unable to initialize task [%d]: %s", id, err)
 		release()
@@ -70,7 +70,7 @@ func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 
 	return prepareWaiter(load(
 		func() { defer release(); task.Listen(); this.logger.Printf("[INFO] Task [%d] is finished.", id) },
-		func() { defer closeResource(newer); <-this.context.Done() },
+		func() { defer closeResource(newer); <-this.childContext.Done() },
 		func() {
 			select {
 			case <-ctx.Done():
@@ -96,7 +96,7 @@ func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 
 func (this *defaultRunner) Reload() {
 	select {
-	case <-this.context.Done(): // already shut down
+	case <-this.childContext.Done(): // already shut down
 	case this.reloadSignals <- syscall.Signal(0):
 	default: // reloads chan may be full
 	}
@@ -104,7 +104,7 @@ func (this *defaultRunner) Reload() {
 
 func (this *defaultRunner) Close() error {
 	this.info("Request to close runner received, shutting down runner along with any associated task(s)...")
-	this.cancel()
+	this.childCancel()
 	signal.Stop(this.terminationSignals)
 	signal.Stop(this.reloadSignals)
 	return nil
