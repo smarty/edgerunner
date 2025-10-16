@@ -150,7 +150,7 @@ func (this *Fixture) TestSubsequentTaskFailsReadinessCheck_ClosedImmediately_Pre
 	this.So(task2.listened.Load(), should.Equal, 1)
 	this.So(task2.closed.Load(), should.Equal, 1)
 
-	this.So(this.runnerLog.history, should.ContainSubstring, "|[WARN] Pending task [1] did not arrive at a ready state.|\n")
+	this.So(this.runnerLog.history, should.ContainSubstring, "|[ERROR] Pending task [1] did not arrive at a ready state.|\n")
 	this.So(this.runnerLog.history, should.ContainSubstring, "|[INFO] Continuing with previous task.|\n")
 }
 func (this *Fixture) TestTerminate() {
@@ -208,6 +208,6 @@ func (this *Fixture) TestReadinessTimeoutReached_TaskAborted() {
 	this.So(task2.initialized.Load(), should.Equal, 1)
 	this.So(task2.listened.Load(), should.Equal, 1)
 	this.So(task2.closed.Load(), should.Equal, 1)
-	this.So(this.runnerLog.history, should.ContainSubstring, "|[WARN] Pending task [1] failed to report readiness before configured timeout of [50ms].|\n")
+	this.So(this.runnerLog.history, should.ContainSubstring, "|[ERROR] Pending task [1] failed to report readiness before configured timeout of [50ms].|\n")
 	this.So(this.runnerLog.history, should.ContainSubstring, "|[INFO] Continuing with previous task.|\n")
 }

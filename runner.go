@@ -50,14 +50,14 @@ func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 	ready := func(state bool) { once.Do(func() { defer close(readiness); readiness <- state }) }
 	task := this.taskFactory(id, ready)
 	if task == nil {
-		this.warn("No task created for ID [%d].", id)
+		this.error("No task created for ID [%d].", id)
 		return nil
 	}
 
 	ctx, release := context.WithTimeout(this.context, this.readinessTimeout)
 	err := task.Initialize(this.parentContext)
 	if err != nil {
-		this.warn("Unable to initialize task [%d]: %s", id, err)
+		this.error("Unable to initialize task [%d]: %s", id, err)
 		release()
 		closeResource(task)
 		return nil
@@ -75,7 +75,7 @@ func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 			select {
 			case <-ctx.Done():
 				if deadline, _ := ctx.Deadline(); deadline.Before(this.now().UTC()) {
-					this.warn("Pending task [%d] failed to report readiness before configured timeout of [%s].", id, this.readinessTimeout)
+					this.error("Pending task [%d] failed to report readiness before configured timeout of [%s].", id, this.readinessTimeout)
 				}
 				this.infoIf(id > 0, "Continuing with previous task.")
 				closeResource(newer)
@@ -85,7 +85,7 @@ func (this *defaultRunner) initializeNextTask() (taskWaiter func()) {
 					this.infoIf(id > 0, "Shutting down previous task.")
 					closeResource(older)
 				} else {
-					this.warn("Pending task [%d] did not arrive at a ready state.", id)
+					this.error("Pending task [%d] did not arrive at a ready state.", id)
 					this.infoIf(id > 0, "Continuing with previous task.")
 					closeResource(newer)
 				}
@@ -115,8 +115,8 @@ func (this *defaultRunner) infoIf(condition bool, format string, args ...any) {
 		this.info(format, args...)
 	}
 }
-func (this *defaultRunner) info(format string, args ...any) { this.log("[INFO] ", format, args...) }
-func (this *defaultRunner) warn(format string, args ...any) { this.log("[WARN] ", format, args...) }
+func (this *defaultRunner) info(format string, args ...any)  { this.log("[INFO] ", format, args...) }
+func (this *defaultRunner) error(format string, args ...any) { this.log("[ERROR] ", format, args...) }
 func (this *defaultRunner) log(prefix, format string, args ...any) {
 	this.logger.Printf(prefix+format, args...)
 }
