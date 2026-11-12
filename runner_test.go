@@ -133,7 +133,7 @@ func (this *Fixture) TestSubsequentTaskFailsReadinessCheck_ClosedImmediately_Pre
 		}))
 		time.Sleep(delay())
 		runner.Reload()
-		time.Sleep(delay())
+		eventually(delay()*3, func() bool { return task2.listened.Load() == 1 })
 
 		this.So(task1.closed.Load(), should.Equal, 0)
 
@@ -193,7 +193,7 @@ func (this *Fixture) TestReadinessTimeoutReached_TaskAborted() {
 			this.Listen(runner, task1, task2)
 		}))
 		runner.Reload()
-		time.Sleep(delay())
+		eventually(delay()*3, func() bool { return task2.listened.Load() == 1 })
 		this.So(task1.closed.Load(), should.Equal, 0)
 
 		this.So(task2.initialized.Load(), should.Equal, 1)

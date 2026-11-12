@@ -31,3 +31,16 @@ func (this *TestLogger) Printf(format string, args ...any) {
 	format = fmt.Sprintf("%s %s %s (%s:%d)", clock, this.prefix, format, file, line)
 	this.Log(fmt.Sprintf(format, args...))
 }
+
+// eventually polls condition until it holds or the timeout elapses. It
+// replaces fixed sleeps, which flake when timers fire late (as under -race).
+func eventually(timeout time.Duration, condition func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for !condition() {
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return true
+}
